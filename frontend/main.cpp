@@ -83,6 +83,7 @@ int main(int argc, char** argv)
 
 
         std::cout << oc::Color::Yellow << "volepsi\n" << oc::Color::Default
+            << "./frontend -perf -mpsi [parameters] : Run a participant with the following parameters.\n"
             << oc::Color::Green << "File based PSI Parameters:\n" << oc::Color::Default
             << "   -in <value>: The path to the party's set. Should either be a binary file containing 16 byte elements with a .bin extension. "
             << "Otherwise the path should have a .csv extension and have one element per row, 32 char hex rows are preferred. \n"
