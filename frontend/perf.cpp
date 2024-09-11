@@ -2,9 +2,11 @@
 #include "cryptoTools/Network/IOService.h"
 #include "volePSI/RsPsi.h"
 #include "volePSI/RsCpsi.h"
+#include "volePSI/Mpsi.h"
 #include "volePSI/SimpleIndex.h"
 
 #include "libdivide.h"
+#include "coproto/Socket/AsioSocket.h"
 using namespace oc;
 using namespace volePSI;;
 
@@ -508,12 +510,110 @@ void perfCPSI(oc::CLP& cmd)
 #endif
 }
 
+#define LEADER_PIVOT_PORT 10000
+#define LEADER_CLIENT_BASE_PORT 10100
+#define PIVOT_CLIENT_BASE_PORT 10500
+
+void perfMpsi_User(oc::CLP& cmd)
+{
+
+	// init
+
+	u64 User_Num = cmd.getOr("nu", 2ull);
+	u64 My_Id = cmd.getOr("id", User_Num - 1);
+	u64 Set_Size =  1ull << cmd.getOr("nn", 10);
+	u64 Lambda = cmd.getOr("la", 40ull);
+	u64 Thread_Num = cmd.getOr("nt", 1);
+	u64 Test_Size = cmd.getOr("ts", Set_Size/10);
+	bool broadcast = cmd.isSet("bc");
+	bool PSI_CA = cmd.isSet("ca");
+	std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
+	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
+	std::vector<Socket> Chl;
+	u64 Chl_Num;
+	std::string exip;
+
+	// establish channels
+
+	if (My_Id == User_Num - 1){
+		Chl_Num = User_Num - 1;
+		Chl.resize(Chl_Num);
+		for (u64 i = 0ull; i < User_Num - 2; i++){
+			exip = ipl + ":" + std::to_string(LEADER_CLIENT_BASE_PORT + i);
+			Chl[i] = coproto::asioConnect(exip, true);
+		}
+		exip = ipl + ":" + std::to_string(LEADER_PIVOT_PORT);
+		Chl[User_Num - 2] = coproto::asioConnect(exip, true);
+	}
+	else if (My_Id == User_Num - 2){
+		Chl_Num = User_Num - 1;
+		Chl.resize(Chl_Num);
+		for (u64 i = 0ull; i < User_Num - 2; i++){
+			exip = ipp + ":" + std::to_string(PIVOT_CLIENT_BASE_PORT + i);
+			Chl[i] = coproto::asioConnect(exip, true);
+		}
+		exip = ipl + ":" + std::to_string(LEADER_PIVOT_PORT);
+		Chl[User_Num - 2] = coproto::asioConnect(exip, false);
+	}
+	else {
+		Chl_Num = 2;
+		Chl.resize(Chl_Num);
+		exip = ipl + ":" + std::to_string(LEADER_CLIENT_BASE_PORT + My_Id);
+		Chl[0] = coproto::asioConnect(exip, false);
+		exip = ipp + ":" + std::to_string(PIVOT_CLIENT_BASE_PORT + My_Id);
+		Chl[1] = coproto::asioConnect(exip, false);
+	}
+
+	PRNG prng(toBlock(My_Id));
+
+	if (My_Id == User_Num - 1)
+		std::cout << "Mpsi_Tests:" << std::endl \
+			<< "User_Num:" << User_Num << " Receiver_Id:" << My_Id << " Set_Size:" << Set_Size  \
+			<< " Lambda:" << Lambda << " Thread_Num:" << Thread_Num << std::endl <<std::endl;
+
+	// generate input sets
+
+	std::vector<block> User_Set(Set_Size);	
+	prng.get<block>(User_Set);
+
+	for (u64 j=0ull; j<Test_Size; j++)
+			User_Set[j*(My_Id+1)%Set_Size]=toBlock(j);
+	
+	// run a participant in benchmark (/volepsi/Mpsi.cpp)
+
+	Mpsi_User User;
+	Timer time, timer;
+	block Seed=ZeroBlock;
+	User.setTimer(timer);
+	time.setTimePoint("start");
+	User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);
+	time.setTimePoint("end");
+
+	// output at the terminal
+
+	if (broadcast || My_Id == User_Num - 1)
+		std::cout << "P" << My_Id << "\'s Intersection Size: " << User.Size_Intersection<< std::endl;
+
+	if (My_Id == User_Num - 1 || My_Id == User_Num - 2 || My_Id == User_Num - 3){
+		std::cout <<"User_Id:" << My_Id << std::endl << "Comm: "<< User.Comm /1024.0 /1024 << "MB" << std::endl << time << std::endl;
+		std::cout << timer << '\n' << std::endl;
+	}
+
+	for (u64 i = 0ull; i < Chl_Num; i++)
+		coproto::sync_wait(Chl[i].close());
+	return ;
+}
+
+
+
 void perf(oc::CLP& cmd)
 {
 	if (cmd.isSet("psi"))
 		return perfPSI(cmd);
 	if (cmd.isSet("cpsi"))
 		perfCPSI(cmd);
+	if (cmd.isSet("mpsi"))
+		perfMpsi_User(cmd);
 	if (cmd.isSet("paxos"))
 		perfPaxos(cmd);
 	if (cmd.isSet("baxos"))

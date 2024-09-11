@@ -1,2 +1,131 @@
 # BZS-MPSI
-The implementation of "Efficient Scalable Multi-Party Private Set Intersection(-Variants) from Bicentric Zero-Sharing"
+
+This is the implementation of our paper: **Efficient Scalable Multi-Party Private Set Intersection(-Variants) from Bicentric Zero-Sharing**. 
+The part of two-party PSI is based on [volePSI](https://github.com/Visa-Research/volepsi) from [VOLE-PSI: Fast OPRF and Circuit-PSI from Vector-OLE](https://eprint.iacr.org/2021/266) and [Blazing Fast PSI from Improved OKVS and Subfield VOLE](https://eprint.iacr.org/2022/320.pdf).
+
+## Building the project
+
+The project can be built in a Linux system with networking support using the following instructions:
+
+```shell
+git clone https://github.com/orzcy/BZS-MPSI.git
+sudo apt-get install -y build-essential
+sudo apt-get install -y libtool
+sudo apt-get install -y libssl-dev
+cd BZS-MPSI
+python3 build.py -DVOLE_PSI_ENABLE_BOOST=ON
+```
+
+After the building process, the executable `frontend` will be located at `out/build/linux/frontend`.
+
+**We also provide a dockerfile-based approach to build the project.**
+
+```shell
+git clone https://github.com/orzcy/BZS-MPSI.git
+cd BZS-MPSI
+docker build --no-cache -t [Your Image Name] .
+docker run -itd --net=host --name [Your Container Name] --cap-add=NET_ADMIN [Your Image ID] /bin/bash
+docker exec -it [Your Container ID] /bin/bash 
+```
+
+After the (dockerfile-based) building process, the executable `frontend` will be located at `root/BZS-MPSI/out/build/linux/frontend` in the docker container.
+
+## Running the code
+
+Use the following instruction in `frontend` to run a participant:
+
+```shell
+./frontend -mpsi [Parameters]
+```
+
+Required parameters:
+* `-in [value]`, value: the path to the party's set. The path should have a \".csv\" extension with one element with 32 char hex per row.
+* `-out [value]`, value: the output file path (default "in || .out"). 
+* `-nu [value]`, value: the number of participants.
+* `-id [value]`, value: participant ID (the IDs of Clients range from 0 to nu-3, the ID of Pivot is nu-2, and the ID of Leader is nu-1).
+* `-ipp [value]`, value: IP address and base port of Pivot.
+* `-ipl [value]`, value: IP address and base port of Leader.
+
+Optional parameters:
+* `-nt [value]`, value: the number of threads allocated to the participant (default 1).
+* `-la [value]`, value: the statistical security parameter (default 40).
+* `-ca`, if this option appears, run MPSI-CA instead of MPSI (default false).
+* `-bc`, if this option appears, Leader broadcasts the result at the end (default false).
+
+There are some examples to illustrate how to run the code:
+
+````shell
+# enter out/build/linux/frontend
+cd out/build/linux/frontend
+
+# run MPSI with 4 participants (in 4 different terminals)
+# The input files are P1~P4.csv
+# Pivot's IP address is 192.168.0.10, and the base port is 10000
+# Leader's IP address is 192.168.0.11, and the base port is 12000
+# Leader computes the intersection and writes it to O4.csv
+
+./frontend -mpsi -nu 4 -id 0 -in P1.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
+
+./frontend -mpsi -nu 4 -id 1 -in P2.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
+
+./frontend -mpsi -nu 4 -id 2 -in P3.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
+
+./frontend -mpsi -nu 4 -id 3 -in P4.csv -out O4.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
+
+# run MPSI-CA with 4 participants (in 4 different terminals)
+# Allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each
+# The input files are P1~P4.csv
+# Pivot's IP address is 192.168.0.10, and the base port is 10000
+# Leader's IP address is 192.168.0.11, and the base port is 12000
+# Leader computes the size of the intersection and broadcasts it to all participants
+# The output files are O1~O4.csv
+
+./frontend -mpsi -nu 4 -id 0 -in P1.csv -out O1.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc
+
+./frontend -mpsi -nu 4 -id 1 -in P2.csv -out O2.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc
+
+./frontend -mpsi -nu 4 -id 2 -in P3.csv -out O3.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc -nt 4
+
+./frontend -mpsi -nu 4 -id 3 -in P4.csv -out O4.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc -nt 4
+````
+
+**We also provide a benchmark based on a single machine, simulated networks, and random inputs.**
+
+```shell
+./frontend -perf -mpsi [Parameters]
+```
+
+Required parameters:
+* `-nu [value]`, value: the number of participants.
+* `-id [value]`, value: participant ID (the IDs of Clients range from 0 to nu-3, the ID of Pivot is nu-2, and the ID of Leader is nu-1).
+* `-nn [value]`, value: the log2 size of the set (default 10). In the benchmark, please enter the same `nn` for all participants.
+
+Optional parameters:
+* `-ts [value]`, value: the preset intersection size to verify the correctness (default 0.1*set size).
+* `-nt [value]`, value: the number of threads allocated to the participant (default 1).
+* `-la [value]`, value: the statistical security parameter (default 40).
+* `-ca`, if this option appears, run MPSI-CA instead of MPSI (default false).
+* `-bc`, if this option appears, Leader broadcasts the result at the end (default false).
+
+There are some examples to illustrate how to run the benchmark:
+
+````shell
+# run MPSI benchmark with 5 participants, 2^20 set size, and preset the intersection size as 1000
+./frontend -perf -mpsi -nu 5 -id 0 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 1 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 2 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 3 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 4 -nn 20 -ts 1000
+
+# run MPSI-CA benchmark with 5 participants, 2^16 set size, allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each, and preset the intersection size as 100
+./frontend -perf -mpsi -nu 5 -id 0 -nn 16 -ts 100 -ca & ./frontend -perf -mpsi -nu 5 -id 1 -nn 16 -ts 100 -ca & ./frontend -perf -mpsi -nu 5 -id 2 -nn 16 -ts 100 -ca & ./frontend -perf -mpsi -nu 5 -id 3 -nn 16 -ts 100 -ca -nt 4 & ./frontend -perf -mpsi -nu 5 -id 4 -nn 16 -ts 100 -ca -nt 4
+````
+
+The program will output the running time and communication cost of Client (ID = nu-3), Pivot (ID = nu-2), and Leader (ID = nu-1), along with the resulting intersection size obtained by Leader on the terminal.
+
+In addition, we use `tc` command to set our LAN and WAN settings.
+
+````shell
+# 1. LAN setting: 20Gbps rate, 0.02ms latency
+sudo tc qdisc add dev lo root netem rate 20Gbit delay 0.02ms
+# 2. WAN setting: 200Mbps rate, 96ms latency
+sudo tc qdisc add dev lo root netem rate 200Mbit delay 96ms
+# 3. Delete all the limits on "lo"
+sudo tc qdisc del dev lo root
+````

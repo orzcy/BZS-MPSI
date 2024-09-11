@@ -19,5 +19,6 @@ void perfBuildRow(oc::CLP& cmd);
 void perfPaxos(oc::CLP& cmd);
 void perfPSI(oc::CLP& cmd);
 void perfCPSI(oc::CLP& cmd);
+void perfMpsi_User(oc::CLP& cmd);
 
 void perf(oc::CLP& cmd);

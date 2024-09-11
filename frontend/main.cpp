@@ -16,7 +16,14 @@ int main(int argc, char** argv)
     //return 0;
     if (cmd.isSet("in"))
     {
-        volePSI::doFilePSI(cmd);
+        if (cmd.isSet("mpsi"))
+        {
+            volePSI::doFileMPSI(cmd);
+        }
+        else 
+        {
+            volePSI::doFilePSI(cmd);
+        }
     }
     else if (cmd.isSet("messagePassing"))
     {
@@ -45,8 +52,38 @@ int main(int argc, char** argv)
     }
     else
     {
+        std::cout << oc::Color::Yellow << "BZS-MPSI\n" << oc::Color::Default
+            << oc::Color::Green << "File-based MPSI Parameters:\n" << oc::Color::Default
+            << "./frontend -mpsi [parameters] : Run a participant with the following parameters.\n"
+            << "    Required parameters\n:"
+            << "    -in <value>: the path to the party's set. The path should have a \".csv\" extension with one element with 32 char hex per row.\n"
+            << "    -out <value>: the output file path (default \"in || .out\").\n"
+            << "    -nu <value>: the number of participants.\n"
+            << "    -id <value>: participant ID (the IDs of Clients range from 0 to nu-3, the ID of Pivot is nu-2, and the ID of Leader is nu-1).\n"
+            << "    -ipp <value>: IP address and base port of Pivot.\n"
+            << "    -ipl <value>: IP address and base port of Leader.\n"
+            << "    Optional parameters:\n"
+            << "    -nt <value>: the number of threads allocated to the participant (default 1).\n"
+            << "    -la <value>: the statistical security parameter (default 40).\n"
+            << "    -ca, if this option appears, run MPSI-CA instead of MPSI (default false).\n"
+            << "    -bc, if this option appears, Leader broadcasts the result at the end (default false).\n"
+            << oc::Color::Green << "MPSI Benchmark Parameters:\n" << oc::Color::Default
+            << "    Required parameters:\n"
+            << "    -nu <value>: the number of participants.\n"
+            << "    -id <value>: participant ID (the IDs of Clients range from 0 to nu-3, the ID of Pivot is nu-2, and the ID of Leader is nu-1).\n"
+            << "    -nn <value>: the log2 size of the set (default 10). In the benchmark, please enter the same \"nn\" for all participants.\n"
+            << "    Optional parameters:\n"
+            << "    -ts <value>: the preset intersection size to verify the correctness (default 0.1*set size).\n"
+            << "    -nt <value>: the number of threads allocated to the participant (default 1).\n"
+            << "    -la <value>: the statistical security parameter (default 40).\n"
+            << "    -ca, if this option appears, run MPSI-CA instead of MPSI (default false).\n"
+            << "    -bc, if this option appears, Leader broadcasts the result at the end (default false).\n\n"
 
-        std::cout << oc::Color::Green << "File based PSI Parameters:\n" << oc::Color::Default
+        ;
+
+
+        std::cout << oc::Color::Yellow << "volepsi\n" << oc::Color::Default
+            << oc::Color::Green << "File based PSI Parameters:\n" << oc::Color::Default
             << "   -in <value>: The path to the party's set. Should either be a binary file containing 16 byte elements with a .bin extension. "
             << "Otherwise the path should have a .csv extension and have one element per row, 32 char hex rows are preferred. \n"
 
@@ -116,10 +153,6 @@ int main(int argc, char** argv)
             << "      -nt: number of threads.\n"
 
             ;
-
-
-
-
 
         std::cout << oc::Color::Green << "Unit tests: \n" << oc::Color::Default
             << "   -u: Run all of the unit tests.\n"

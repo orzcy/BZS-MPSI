@@ -1,6 +1,7 @@
 #include "fileBased.h"
 #include "cryptoTools/Crypto/RandomOracle.h"
 #include "RsPsi.h"
+#include "fbMpsi.h"
 
 #include "coproto/Socket/AsioSocket.h"
 
@@ -424,6 +425,164 @@ namespace volePSI
 
             std::cout << "Try adding command line argument -debug" << std::endl;
         }
+    }
+
+    void doFileMPSI(const oc::CLP& cmd)
+    {
+        try{
+
+            // init
+
+            fbMpsi_User User;
+            auto inpath = cmd.get<std::string>("in");
+            auto outPath = cmd.getOr<std::string>("out", inpath + ".out");
+            u64 User_Num = cmd.getOr("nu", 3ull);
+            u64 My_Id = cmd.getOr("id", User_Num - 1);
+            u64 Lambda = cmd.getOr("la", 40ull);
+            u64 Thread_Num = cmd.getOr("nt", 1ull);
+            bool broadcast = cmd.isSet("bc");
+            bool PSI_CA = cmd.isSet("ca");
+
+            std::string ipp = cmd.get<std::string>("ipp");
+            std::string ipl = cmd.get<std::string>("ipl");
+            
+            size_t ipp_pos = ipp.find(":");
+            std::string ipp_address  = ipp.substr(0,ipp_pos);
+            std::string ipp_baseport = ipp.substr(ipp_pos+1, ipp.size());
+            u64 ipp_baseport_num = std::stoi(ipp_baseport);
+
+            size_t ipl_pos = ipp.find(":");
+            std::string ipl_address  = ipl.substr(0,ipl_pos);
+            std::string ipl_baseport = ipl.substr(ipl_pos+1, ipl.size());
+            u64 ipl_baseport_num = std::stoi(ipl_baseport);
+
+            // establish channels
+
+            std::vector<Socket> Chl;
+            u64 Chl_Num;
+
+            if (My_Id == User_Num - 1){
+                Chl_Num = User_Num - 1;
+                Chl.resize(Chl_Num);
+                for (u64 i = 0ull; i < User_Num - 1; i++)
+                    Chl[i] = coproto::asioConnect(ipl_address + ":" + std::to_string(i + ipl_baseport_num), true);
+            }
+            else if (My_Id == User_Num - 2){
+                Chl_Num = User_Num - 1;
+                Chl.resize(Chl_Num);
+                for (u64 i = 0ull; i < User_Num - 2; i++)
+                    Chl[i] = coproto::asioConnect(ipp_address + ":" + std::to_string(i + ipp_baseport_num), true);
+                Chl[User_Num - 2] = coproto::asioConnect(ipl_address + ":" + std::to_string(User_Num - 2 + ipl_baseport_num), false);
+            }
+            else {
+                Chl_Num = 2;
+                Chl.resize(Chl_Num);
+                Chl[0] = coproto::asioConnect(ipl_address + ":" + std::to_string(My_Id + ipl_baseport_num), false);
+                Chl[1] = coproto::asioConnect(ipp_address + ":" + std::to_string(My_Id + ipp_baseport_num), false);
+            }
+
+            block Seed;
+            if (cmd.hasValue("seed"))
+            {
+                auto seedStr = cmd.get<std::string>("seed");
+                oc::RandomOracle ro(sizeof(block));
+                ro.Update(seedStr.data(), seedStr.size());
+                ro.Final(Seed);
+            }
+            else
+                Seed = oc::sysRandomSeed();
+
+            // read input from file
+
+            FileType ft = FileType::Unspecified;
+            if (hasSuffix(inpath, ".csv"))
+                ft = FileType::Csv;
+            if (ft != FileType::Csv)
+                throw std::runtime_error("unknown file extension, must be .csv .");
+            
+            std::vector<block> User_Set;
+
+            std::ifstream file(inpath, std::ios::in);
+            if (file.is_open() == false)
+                throw std::runtime_error("failed to open file: " + inpath);
+            std::string buffer;
+            while (std::getline(file, buffer))
+                User_Set.push_back(hexToBlock(buffer));
+
+            // "synchronize" Set_Size
+            // unlike the benchmark, different participants may have different set sizes in real-life scenarios
+
+            u64 Set_Size[User_Num]={0};
+            Set_Size[My_Id] = User_Set.size();
+
+            if (My_Id == User_Num - 1){
+                std::vector<std::thread> Thrds(User_Num - 1);
+                for (u64 i = 0ull; i < User_Num - 1; i++){
+                    Thrds[i] = std::thread([&, i]() {
+                        coproto::sync_wait(Chl[i].send(Set_Size[My_Id]));
+                        return ;
+                    });
+                }
+                for (auto& thrd : Thrds) thrd.join();
+                coproto::sync_wait(Chl[User_Num - 2].recv(Set_Size[User_Num - 2]));
+            }
+            else if (My_Id == User_Num - 2){
+                std::vector<std::thread> SendThrds(User_Num - 1);
+                for (u64 i = 0ull; i < User_Num - 1; i++){
+                    SendThrds[i] = std::thread([&, i]() {
+                        coproto::sync_wait(Chl[i].send(Set_Size[My_Id]));
+                        return ;
+                    });
+                }
+                for (auto& thrd : SendThrds) thrd.join();
+                
+                std::vector<std::thread> RecvThrds(User_Num - 1);
+                for (u64 i = 0ull; i < User_Num - 1; i++){
+                    RecvThrds[i] = std::thread([&, i]() {
+                        if (i < User_Num - 2)
+                            coproto::sync_wait(Chl[i].recv(Set_Size[i]));
+                        else
+                            coproto::sync_wait(Chl[i].recv(Set_Size[i+1]));
+                        return ;
+                    });
+                }
+                for (auto& thrd : RecvThrds) thrd.join();
+            }
+            else {
+                coproto::sync_wait(Chl[1].send(Set_Size[My_Id]));
+                coproto::sync_wait(Chl[0].recv(Set_Size[User_Num - 1]));
+            }
+            
+            // run a participant in BZS-MPSI (/volepsi/fbMpsi.cpp)
+
+            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, osuCrypto::ZeroBlock, User_Set, Chl, PSI_CA, broadcast);
+
+            // write output to file
+
+            if ( (My_Id == User_Num - 1) || broadcast){
+
+                std::ofstream dest;
+                dest.open(outPath, std::ios::trunc | std::ios::out);
+                if (!PSI_CA){
+                    for (u64 i = 0ull; i < User.Size_Intersection; i++){
+                        dest << User.Multi_Intersection[i] << std::endl;
+                    }
+                }
+                else {
+                    dest << User.Size_Intersection << std::endl;
+                }
+                dest.close();     
+            } 
+
+            for (u64 i = 0ull; i < Chl_Num; i++)
+		        coproto::sync_wait(Chl[i].close());
+
+        }
+        catch (std::exception& e)
+        {
+            std::cout << oc::Color::Red << "Exception: " << e.what() << std::endl << oc::Color::Default;
+        }
+        return ;
     }
 
 }
