@@ -55,24 +55,22 @@ Optional parameters:
 There are some examples to illustrate how to run the code:
 
 ````shell
-# enter out/build/linux/frontend
+# Enter out/build/linux/frontend
+
 cd out/build/linux/frontend
 
-# run MPSI with 4 participants (in 4 different terminals)
+# Run MPSI with 4 participants (in 4 different terminals)
 # The input files are P1~P4.csv
 # Pivot's IP address is 192.168.0.10, and the base port is 10000
 # Leader's IP address is 192.168.0.11, and the base port is 12000
 # Leader computes the intersection and writes it to O4.csv
 
 ./frontend -mpsi -nu 4 -id 0 -in P1.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
-
 ./frontend -mpsi -nu 4 -id 1 -in P2.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
-
 ./frontend -mpsi -nu 4 -id 2 -in P3.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
-
 ./frontend -mpsi -nu 4 -id 3 -in P4.csv -out O4.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000
 
-# run MPSI-CA with 4 participants (in 4 different terminals)
+# Run MPSI-CA with 4 participants (in 4 different terminals)
 # Allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each
 # The input files are P1~P4.csv
 # Pivot's IP address is 192.168.0.10, and the base port is 10000
@@ -81,11 +79,8 @@ cd out/build/linux/frontend
 # The output files are O1~O4.csv
 
 ./frontend -mpsi -nu 4 -id 0 -in P1.csv -out O1.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc
-
 ./frontend -mpsi -nu 4 -id 1 -in P2.csv -out O2.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc
-
 ./frontend -mpsi -nu 4 -id 2 -in P3.csv -out O3.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc -nt 4
-
 ./frontend -mpsi -nu 4 -id 3 -in P4.csv -out O4.csv -ipp 192.168.0.10:10000 -ipl 192.168.0.11:12000 -ca -bc -nt 4
 ````
 
@@ -110,11 +105,21 @@ Optional parameters:
 There are some examples to illustrate how to run the benchmark:
 
 ````shell
-# run MPSI benchmark with 5 participants, 2^20 set size, and preset the intersection size as 1000
-./frontend -perf -mpsi -nu 5 -id 0 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 1 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 2 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 3 -nn 20 -ts 1000 & ./frontend -perf -mpsi -nu 5 -id 4 -nn 20 -ts 1000
+# Run MPSI benchmark with 5 participants, 2^20 set size, and preset the intersection size as 1000
 
-# run MPSI-CA benchmark with 5 participants, 2^16 set size, allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each, and preset the intersection size as 100
-./frontend -perf -mpsi -nu 5 -id 0 -nn 16 -ts 100 -ca & ./frontend -perf -mpsi -nu 5 -id 1 -nn 16 -ts 100 -ca & ./frontend -perf -mpsi -nu 5 -id 2 -nn 16 -ts 100 -ca & ./frontend -perf -mpsi -nu 5 -id 3 -nn 16 -ts 100 -ca -nt 4 & ./frontend -perf -mpsi -nu 5 -id 4 -nn 16 -ts 100 -ca -nt 4
+./frontend -perf -mpsi -nu 5 -id 0 -nn 20 -ts 1000 & 
+./frontend -perf -mpsi -nu 5 -id 1 -nn 20 -ts 1000 & 
+./frontend -perf -mpsi -nu 5 -id 2 -nn 20 -ts 1000 & 
+./frontend -perf -mpsi -nu 5 -id 3 -nn 20 -ts 1000 & 
+./frontend -perf -mpsi -nu 5 -id 4 -nn 20 -ts 1000
+
+# Run MPSI-CA benchmark with 5 participants, 2^16 set size, allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each, and preset the intersection size as 100
+
+./frontend -perf -mpsi -nu 5 -id 0 -nn 16 -ts 100 -ca & 
+./frontend -perf -mpsi -nu 5 -id 1 -nn 16 -ts 100 -ca & 
+./frontend -perf -mpsi -nu 5 -id 2 -nn 16 -ts 100 -ca & 
+./frontend -perf -mpsi -nu 5 -id 3 -nn 16 -ts 100 -ca -nt 4 & 
+./frontend -perf -mpsi -nu 5 -id 4 -nn 16 -ts 100 -ca -nt 4
 ````
 
 The program will output the running time and communication cost of Client (ID = nu-3), Pivot (ID = nu-2), and Leader (ID = nu-1), along with the resulting intersection size obtained by Leader on the terminal.
@@ -122,10 +127,15 @@ The program will output the running time and communication cost of Client (ID = 
 In addition, we use `tc` command to set our LAN and WAN settings.
 
 ````shell
-# 1. LAN setting: 20Gbps rate, 0.02ms latency
+# LAN setting: 20Gbps rate, 0.02ms latency
+
 sudo tc qdisc add dev lo root netem rate 20Gbit delay 0.02ms
-# 2. WAN setting: 200Mbps rate, 96ms latency
+
+# WAN setting: 200Mbps rate, 96ms latency
+
 sudo tc qdisc add dev lo root netem rate 200Mbit delay 96ms
-# 3. Delete all the limits on "lo"
+
+# Delete all the limits on "lo"
+
 sudo tc qdisc del dev lo root
 ````
