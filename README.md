@@ -113,7 +113,8 @@ There are some examples to illustrate how to run the benchmark:
 ./frontend -perf -mpsi -nu 5 -id 3 -nn 20 -ts 1000 & 
 ./frontend -perf -mpsi -nu 5 -id 4 -nn 20 -ts 1000
 
-# Run MPSI-CA benchmark with 5 participants, 2^16 set size, allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each, and preset the intersection size as 100
+# Run MPSI-CA benchmark with 5 participants, 2^16 set size
+# Allocate 4 threads for Pivot (ID = 3) and Leader (ID = 4) each, and preset the intersection size as 100
 
 ./frontend -perf -mpsi -nu 5 -id 0 -nn 16 -ts 100 -ca & 
 ./frontend -perf -mpsi -nu 5 -id 1 -nn 16 -ts 100 -ca & 
