@@ -28,7 +28,7 @@ docker run -itd --net=host --name [Your Container Name] --cap-add=NET_ADMIN [You
 docker exec -it [Your Container ID] /bin/bash 
 ```
 
-After the (dockerfile-based) building process, the executable `frontend` will be located at `root/BZS-MPSI/out/build/linux/frontend` in the docker container.
+After the (dockerfile-based) building process, the executable `frontend` will be located at `app/BZS-MPSI/out/build/linux/frontend` in the docker container.
 
 ## Running the code
 
