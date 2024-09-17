@@ -12,6 +12,7 @@ git clone https://github.com/orzcy/BZS-MPSI.git
 sudo apt-get install -y build-essential
 sudo apt-get install -y libtool
 sudo apt-get install -y libssl-dev
+sudo apt-get install -y cmake=3.22.*
 cd BZS-MPSI
 python3 build.py -DVOLE_PSI_ENABLE_BOOST=ON
 ```
