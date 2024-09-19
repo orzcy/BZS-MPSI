@@ -5,14 +5,13 @@ The part of two-party PSI is based on [volePSI](https://github.com/Visa-Research
 
 ## Building the project
 
-The project can be built in a Linux system with networking support using the following instructions:
+The project can be built in a Linux system with networking support using the following instructions. The recommended versions are ``Ubuntu:22.04 LTS, g++ 11.4.0, and CMake 3.22.1`` or higher. Otherwise, we highly recommend using the dockerfile-based approach introduced later for better reproducibility.
 
 ```shell
 git clone https://github.com/orzcy/BZS-MPSI.git
-sudo apt-get install -y build-essential
-sudo apt-get install -y libtool
-sudo apt-get install -y libssl-dev
-sudo apt-get install -y cmake=3.22.*
+sudo apt-get update -y
+sudo apt-get install -y build-essential gcc g++ libtool libssl-dev cmake=3.22.*
+
 cd BZS-MPSI
 python3 build.py -DVOLE_PSI_ENABLE_BOOST=ON
 ```
