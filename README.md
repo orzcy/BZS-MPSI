@@ -8,18 +8,19 @@ The part of two-party PSI is based on [volePSI](https://github.com/Visa-Research
 The project can be built in a Linux system with networking support using the following instructions. The recommended versions are ``Ubuntu:22.04 LTS, g++ 11.4.0, and CMake 3.22.1`` or higher. Otherwise, we highly recommend using the dockerfile-based approach introduced later for better reproducibility.
 
 ```shell
-git clone https://github.com/orzcy/BZS-MPSI.git
 sudo apt-get update -y
-sudo apt-get install -y build-essential gcc g++ libtool libssl-dev cmake=3.22.*
+sudo apt-get install -y build-essential gcc g++ libtool libssl-dev git cmake=3.22.*
 
+git clone https://github.com/orzcy/BZS-MPSI.git
 cd BZS-MPSI
 python3 build.py -DVOLE_PSI_ENABLE_BOOST=ON
 ```
 
 After the building process, the executable `frontend` will be located at `out/build/linux/frontend`.
 
-**We also provide a dockerfile-based approach to build the project.**
+**We also provide some docker-based approaches to build the project.**
 
+The dockerfile-based building approach:
 ```shell
 git clone https://github.com/orzcy/BZS-MPSI.git
 cd BZS-MPSI
@@ -28,7 +29,13 @@ docker run -itd --net=host --name [Your Container Name] --cap-add=NET_ADMIN [You
 docker exec -it [Your Container ID] /bin/bash 
 ```
 
-After the (dockerfile-based) building process, the executable `frontend` will be located at `app/BZS-MPSI/out/build/linux/frontend` in the docker container.
+The docker-image-based building approach:
+```shell
+docker pull orzcy/bzs-di:latest
+docker run -itd --net=host --name bzs-di --cap-add=NET_ADMIN orzcy/bzs-di:latest /bin/bash
+docker exec -it bzs-di /bin/bash 
+```
+After the (docker-based) building process, the executable `frontend` will be located at `app/BZS-MPSI/out/build/linux/frontend` in the docker container.
 
 ## Running the code
 
@@ -105,6 +112,10 @@ Optional parameters:
 There are some examples to illustrate how to run the benchmark:
 
 ````shell
+# Enter out/build/linux/frontend
+
+cd out/build/linux/frontend
+
 # Run MPSI benchmark with 5 participants, 2^20 set size, and preset the intersection size as 1000
 
 ./frontend -perf -mpsi -nu 5 -id 0 -nn 20 -ts 1000 & 
