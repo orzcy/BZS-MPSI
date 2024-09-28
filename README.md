@@ -93,6 +93,7 @@ cd out/build/linux/frontend
 
 **We also provide a benchmark based on a single machine, simulated networks, and random inputs.**
 
+Use the following instruction in `frontend` to run a participant:
 ```shell
 ./frontend -perf -mpsi [Parameters]
 ```
