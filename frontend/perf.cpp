@@ -577,7 +577,7 @@ void perfMpsi_User(oc::CLP& cmd)
 	prng.get<block>(User_Set);
 
 	for (u64 j=0ull; j<Test_Size; j++)
-			User_Set[j*(My_Id+1)%Set_Size]=toBlock(j);
+		User_Set[(j+My_Id)%Set_Size]=toBlock(j);
 	
 	// run a participant in benchmark (/volepsi/Mpsi.cpp)
 
