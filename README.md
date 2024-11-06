@@ -93,7 +93,12 @@ cd out/build/linux/frontend
 
 **We also provide a benchmark based on a single machine, simulated networks, and random inputs.**
 
-Use the following instruction in `frontend` to run a participant:
+Use the following instruction in `frontend` to run the unit tests:
+```shell
+./frontend -u -mpsi
+```
+
+And use the following instruction in `frontend` to run a participant:
 ```shell
 ./frontend -perf -mpsi [Parameters]
 ```
@@ -116,6 +121,10 @@ There are some examples to illustrate how to run the benchmark:
 # Enter out/build/linux/frontend
 
 cd out/build/linux/frontend
+
+# Run the unit tests
+
+./frontend -u -mpsi
 
 # Run MPSI benchmark with 5 participants, 2^20 set size, and preset the intersection size as 1000
 
