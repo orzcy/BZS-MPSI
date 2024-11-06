@@ -12,3 +12,7 @@ namespace volePSI_Tests
 {
     extern osuCrypto::TestCollection Tests;
 }
+namespace MPSI_Tests
+{
+    extern osuCrypto::TestCollection Tests;
+}

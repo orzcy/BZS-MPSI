@@ -12,10 +12,12 @@
 #include "GMW_Tests.h"
 #include "volePSI/GMW/Circuit.h"
 #include "FileBase_Tests.h"
+#include "MPSI_Tests.h"
 
 namespace volePSI_Tests
 {
     using namespace volePSI;
+
     oc::TestCollection Tests([](oc::TestCollection& t) {
         
         t.add("Paxos_buildRow_Test         ", Paxos_buildRow_Test);
@@ -84,6 +86,28 @@ namespace volePSI_Tests
         t.add("filebase_psi_bin_Test       ", filebase_psi_bin_Test);
         t.add("filebase_psi_csv_Test       ", filebase_psi_csv_Test);
         t.add("filebase_psi_csvh_Test      ", filebase_psi_csvh_Test);
+
+    });
+}
+
+namespace MPSI_Tests
+{
+    using namespace volePSI;
+
+    oc::TestCollection Tests([](oc::TestCollection& t) {
+
+        t.add("MPSI_3Party_Empty_Test      ", MPSI_3Party_Empty_Test);
+        t.add("MPSI_3Party_Partial_Test    ", MPSI_3Party_Partial_Test);
+        t.add("MPSI_3Party_Full_Test       ", MPSI_3Party_Full_Test);
+        t.add("MPSI_3Party_Mthreads_Test   ", MPSI_3Party_Mthreads_Test);
+        t.add("MPSI_3Party_Cardinality_Test", MPSI_3Party_Cardinality_Test);
+        t.add("MPSI_3Party_Broadcast_Test  ", MPSI_3Party_Broadcast_Test);
+        t.add("MPSI_3Party_Empty_Test      ", MPSI_5Party_Empty_Test);
+        t.add("MPSI_5Party_Partial_Test    ", MPSI_5Party_Partial_Test);
+        t.add("MPSI_5Party_Full_Test       ", MPSI_5Party_Full_Test);
+        t.add("MPSI_5Party_Mthreads_Test   ", MPSI_5Party_Mthreads_Test);
+        t.add("MPSI_5Party_Cardinality_Test", MPSI_5Party_Cardinality_Test);
+        t.add("MPSI_5Party_Broadcast_Test  ", MPSI_5Party_Broadcast_Test);
 
     });
 }

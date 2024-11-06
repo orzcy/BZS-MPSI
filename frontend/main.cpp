@@ -47,8 +47,17 @@ int main(int argc, char** argv)
     }
     else if(cmd.isSet("u"))
     {
-        auto r = volePSI_Tests::Tests.runIf(cmd);
-        return r == oc::TestCollection::Result::failed;
+        if (cmd.isSet("mpsi"))
+            {
+                auto r = MPSI_Tests::Tests.runIf(cmd);
+                return r == oc::TestCollection::Result::failed;
+            }
+            else 
+            {
+                auto r = volePSI_Tests::Tests.runIf(cmd);
+                return r == oc::TestCollection::Result::failed;
+            }
+
     }
     else
     {
