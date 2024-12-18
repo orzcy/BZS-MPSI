@@ -1,11 +1,12 @@
 # BZS-MPSI
 
-This is the implementation of our paper: **Efficient Scalable Multi-Party Private Set Intersection(-Variants) from Bicentric Zero-Sharing**. 
-The part of two-party PSI is based on [volePSI](https://github.com/Visa-Research/volepsi) from [VOLE-PSI: Fast OPRF and Circuit-PSI from Vector-OLE](https://eprint.iacr.org/2021/266) and [Blazing Fast PSI from Improved OKVS and Subfield VOLE](https://eprint.iacr.org/2022/320.pdf).
+BZS-MPSI implements the protocols described in our paper [**Efficient Scalable Multi-Party Private Set Intersection(-Variants) from Bicentric Zero-Sharing (ACM CCS 2024)**](https://dl.acm.org/doi/10.1145/3658644.3690245), which also gets the `Artifacts Evaluated` badge.
+
+When using BZS-MPSI to achieve the MPSI functionality, the part of two-party PSI being invoked is based on [Vole-PSI](https://github.com/Visa-Research/volepsi) from [VOLE-PSI: Fast OPRF and Circuit-PSI from Vector-OLE](https://eprint.iacr.org/2021/266) and [Blazing Fast PSI from Improved OKVS and Subfield VOLE](https://eprint.iacr.org/2022/320.pdf). And thanks to the recent updates and optimizations of Vole-PSI by its contributors, the communication cost of Leader and Pivot in BZS-MPSI will be reduced compared to that presented in Table 5 of our paper.
 
 ## Building the project
 
-The project can be built in a Linux system with networking support using the following instructions. The recommended versions are ``Ubuntu:22.04 LTS, g++ 11.4.0, and CMake 3.22.1`` or higher. Otherwise, we highly recommend using the dockerfile-based approach introduced later for better reproducibility.
+The project can be built in a Linux system with networking support using the following instructions. The recommended versions are ``Ubuntu:22.04 LTS, g++ 11.4.0, and CMake 3.22.1`` or higher. Otherwise, we highly suggest using the dockerfile-based approach introduced later for better reproducibility.
 
 ```shell
 sudo apt-get update -y
