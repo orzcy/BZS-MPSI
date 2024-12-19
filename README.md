@@ -99,7 +99,7 @@ Use the following instruction in `frontend` to run the unit tests:
 ./frontend -u -mpsi
 ```
 
-And use the following instruction in `frontend` to run a participant:
+And use the following instruction in `frontend` to run a participant in benchmark:
 ```shell
 ./frontend -perf -mpsi [Parameters]
 ```
