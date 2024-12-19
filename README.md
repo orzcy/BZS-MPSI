@@ -26,15 +26,15 @@ The dockerfile-based building approach:
 git clone https://github.com/orzcy/BZS-MPSI.git
 cd BZS-MPSI
 docker build --no-cache -t [Your Image Name] .
-docker run -itd --net=host --name [Your Container Name] --cap-add=NET_ADMIN [Your Image ID] /bin/bash
-docker exec -it [Your Container ID] /bin/bash 
+docker run -itd --net=host --name [Your Container Name] --cap-add=NET_ADMIN [Your Image Name(or ID)] /bin/bash
+docker exec -it [Your Container Name(or ID)] /bin/bash 
 ```
 
 The docker-image-based building approach:
 ```shell
 docker pull orzcy/bzs-di:latest
-docker run -itd --net=host --name bzs-di --cap-add=NET_ADMIN orzcy/bzs-di:latest /bin/bash
-docker exec -it bzs-di /bin/bash 
+docker run -itd --net=host --name [Your Container Name] --cap-add=NET_ADMIN orzcy/bzs-di:latest /bin/bash
+docker exec -it [Your Container Name(or ID)] /bin/bash 
 ```
 After the (docker-based) building process, the executable `frontend` will be located at `app/BZS-MPSI/out/build/linux/frontend` in the docker container.
 
