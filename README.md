@@ -10,7 +10,7 @@ The project can be built in a Linux system with networking support using the fol
 
 ```shell
 sudo apt-get update -y
-sudo apt-get install -y build-essential gcc g++ libtool libssl-dev git iproute2 cmake=3.22.*
+sudo apt-get install -y build-essential gcc g++ libtool libssl-dev git iproute2 python3 cmake=3.22.*
 
 git clone https://github.com/orzcy/BZS-MPSI.git
 cd BZS-MPSI
