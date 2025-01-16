@@ -150,13 +150,13 @@ The program will output the running time and communication cost of Client (ID = 
 In addition, we use `tc` command to set our LAN and WAN settings.
 
 ````shell
-# LAN setting: 20Gbps rate, 0.02ms latency
+# LAN setting: 20Gbps bandwidth, 0.01ms latency (i.e. 0.02ms round-trip latency)
 
-sudo tc qdisc add dev lo root netem rate 20Gbit delay 0.02ms
+sudo tc qdisc add dev lo root netem rate 20Gbit delay 0.01ms
 
-# WAN setting: 200Mbps rate, 96ms latency
+# WAN setting: 200Mbps bandwidth, 48ms latency (i.e. 96ms round-trip latency)
 
-sudo tc qdisc add dev lo root netem rate 200Mbit delay 96ms
+sudo tc qdisc add dev lo root netem rate 200Mbit delay 48ms
 
 # Delete all the limits on "lo"
 
