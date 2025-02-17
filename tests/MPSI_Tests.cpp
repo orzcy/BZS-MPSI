@@ -17,7 +17,7 @@ using coproto::LocalAsyncSocket;
 
 namespace
 {
-    Mpsi_User run(u64 User_Num, u64 Set_Size, u64 Lambda, u64 Thread_Num, u64 Test_Size, bool broadcast, bool PSI_CA, std::string ipp, std::string ipl)
+    Mpsi_User run(u64 User_Num, u64 Set_Size, u64 Lambda, u64 Thread_Num, u64 Test_Size, bool PSI_CA, bool broadcast,  std::string ipp, std::string ipl)
     {
         std::vector<Mpsi_User> User(User_Num);
         std::vector<std::thread> Thrds(User_Num);
@@ -84,12 +84,12 @@ void MPSI_3Party_Empty_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = 0;  //empty test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=0) //empty test
         throw RTE_LOC;
@@ -104,12 +104,12 @@ void MPSI_3Party_Partial_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -123,12 +123,12 @@ void MPSI_3Party_Full_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = Set_Size;  //full test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Set_Size) //full test
         throw RTE_LOC;
@@ -143,12 +143,12 @@ void MPSI_3Party_Mthreads_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 4; //multy threads
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -163,12 +163,12 @@ void MPSI_3Party_Cardinality_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = false; //no bc
 	bool PSI_CA = true;  //yes ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Size_Intersection!=Test_Size) //partial test
         throw RTE_LOC;
@@ -183,12 +183,12 @@ void MPSI_3Party_Broadcast_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = true; //yes bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = true; //yes bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -203,12 +203,12 @@ void MPSI_5Party_Empty_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = 0;  //empty test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=0) //empty test
         throw RTE_LOC;
@@ -223,12 +223,12 @@ void MPSI_5Party_Partial_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -242,12 +242,12 @@ void MPSI_5Party_Full_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = Set_Size;  //full test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Set_Size) //full test
         throw RTE_LOC;
@@ -262,12 +262,12 @@ void MPSI_5Party_Mthreads_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 4; //multy threads
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = false; //no bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -282,12 +282,12 @@ void MPSI_5Party_Cardinality_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = false; //no bc
 	bool PSI_CA = true;  //yes ca
+	bool broadcast = false; //no bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Size_Intersection!=Test_Size) //partial test
         throw RTE_LOC;
@@ -302,12 +302,12 @@ void MPSI_5Party_Broadcast_Test(const CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = 1; //single thread
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
-	bool broadcast = true; //yes bc
 	bool PSI_CA = false;  //no ca
+	bool broadcast = true; //yes bc
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, broadcast, PSI_CA, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
