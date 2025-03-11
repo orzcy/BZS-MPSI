@@ -451,7 +451,7 @@ namespace volePSI
             std::string ipp_baseport = ipp.substr(ipp_pos+1, ipp.size());
             u64 ipp_baseport_num = std::stoi(ipp_baseport);
 
-            size_t ipl_pos = ipp.find(":");
+            size_t ipl_pos = ipl.find(":");
             std::string ipl_address  = ipl.substr(0,ipl_pos);
             std::string ipl_baseport = ipl.substr(ipl_pos+1, ipl.size());
             u64 ipl_baseport_num = std::stoi(ipl_baseport);
