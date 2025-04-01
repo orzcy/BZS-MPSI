@@ -230,7 +230,7 @@ namespace volePSI
                 for (u64 i = 0; i < User_Num - 1; ++i){
                     outputThrds[i] = std::thread([&, i]() {
                         coproto::sync_wait(Chl[i].send(Size_Intersection));
-                        if (!PSI_CA)
+                        if (!PSI_CA && Size_Intersection > 0)
                             coproto::sync_wait(Chl[i].send(Multi_Intersection));
                         return ;
                     });
@@ -398,7 +398,7 @@ namespace volePSI
 
             if (broadcast){
                 coproto::sync_wait(Chl[User_Num - 2].recv(Size_Intersection));
-                if (!PSI_CA){
+                if (!PSI_CA && Size_Intersection > 0){
                     Multi_Intersection.resize(Size_Intersection);
                     coproto::sync_wait(Chl[User_Num - 2].recv(Multi_Intersection));
                 }
@@ -467,7 +467,7 @@ namespace volePSI
 
             if (broadcast){
                 coproto::sync_wait(Chl[0].recv(Size_Intersection));
-                if (!PSI_CA){
+                if (!PSI_CA && Size_Intersection > 0){
                     Multi_Intersection.resize(Size_Intersection);
                     coproto::sync_wait(Chl[0].recv(Multi_Intersection));
                 }
