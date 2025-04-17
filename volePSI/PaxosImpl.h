@@ -1139,10 +1139,10 @@ namespace volePSI
 
 							// as an optimization, prefetch this next 
 							// column if its ready to be used..
-							if (node.mWeight == 1)
-							{
-								_mm_prefetch((const char*)&mCols[colIdx2], _MM_HINT_T0);
-							}
+							// if (node.mWeight == 1)
+							// {
+							// 	_mm_prefetch((const char*)&mCols[colIdx2], _MM_HINT_T0);
+							// }
 						}
 					}
 

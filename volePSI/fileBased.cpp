@@ -459,26 +459,49 @@ namespace volePSI
             // establish channels
 
             std::vector<Socket> Chl;
+            std::vector<Socket> Chl_Tmp;
             u64 Chl_Num;
 
             if (My_Id == User_Num - 1){
+                coproto::AsioAcceptor acceptor(ipl, coproto::global_io_context());
                 Chl_Num = User_Num - 1;
                 Chl.resize(Chl_Num);
-                for (u64 i = 0ull; i < User_Num - 1; i++)
-                    Chl[i] = coproto::asioConnect(ipl_address + ":" + std::to_string(i + ipl_baseport_num), true);
+                Chl_Tmp.resize(Chl_Num);
+                for (u64 i = 0ull; i < User_Num - 1; i++){
+                    auto leader_socket = coproto::sync_wait(acceptor.accept());
+                    Chl_Tmp[i] = leader_socket;
+                }
+                for (u64 i = 0ull; i < User_Num - 1; i++){
+                    u64 msg_id;
+                    coproto::sync_wait(Chl_Tmp[i].recv(msg_id));
+                    Chl[msg_id] = Chl_Tmp[i];
+                }
             }
             else if (My_Id == User_Num - 2){
+                coproto::AsioAcceptor acceptor(ipp, coproto::global_io_context());
                 Chl_Num = User_Num - 1;
                 Chl.resize(Chl_Num);
-                for (u64 i = 0ull; i < User_Num - 2; i++)
-                    Chl[i] = coproto::asioConnect(ipp_address + ":" + std::to_string(i + ipp_baseport_num), true);
-                Chl[User_Num - 2] = coproto::asioConnect(ipl_address + ":" + std::to_string(User_Num - 2 + ipl_baseport_num), false);
+                Chl_Tmp.resize(Chl_Num);
+                for (u64 i = 0ull; i < User_Num - 2; i++){
+                    auto pivot_socket = coproto::sync_wait(acceptor.accept());
+                    Chl_Tmp[i] = pivot_socket;
+                }
+                for (u64 i = 0ull; i < User_Num - 2; i++){
+                    u64 msg_id;
+                    coproto::sync_wait(Chl_Tmp[i].recv(msg_id));
+                    Chl[msg_id] = Chl_Tmp[i];
+                }
+                // Chl[i] = coproto::asioConnect(ipp_address + ":" + std::to_string(i + ipp_baseport_num), true);
+                Chl[User_Num - 2] = coproto::asioConnect(ipl, false);
+                coproto::sync_wait(Chl[User_Num - 2].send(My_Id));
             }
             else {
                 Chl_Num = 2;
                 Chl.resize(Chl_Num);
-                Chl[0] = coproto::asioConnect(ipl_address + ":" + std::to_string(My_Id + ipl_baseport_num), false);
-                Chl[1] = coproto::asioConnect(ipp_address + ":" + std::to_string(My_Id + ipp_baseport_num), false);
+                Chl[0] = coproto::asioConnect(ipl, false);
+                Chl[1] = coproto::asioConnect(ipp, false);
+                coproto::sync_wait(Chl[0].send(My_Id));
+                coproto::sync_wait(Chl[1].send(My_Id));
             }
 
             block Seed;
@@ -575,7 +598,7 @@ namespace volePSI
             } 
 
             for (u64 i = 0ull; i < Chl_Num; i++)
-		        coproto::sync_wait(Chl[i].close());
+		        Chl[i].close();
 
         }
         catch (std::exception& e)

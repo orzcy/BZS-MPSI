@@ -66,6 +66,7 @@ namespace volePSI
 
             for (u64 i = 0ull; i < User_Num - 2; i++){
                 shareThrds[i] = std::thread([&, i]() {
+                    coproto::sync_wait(Chl[i].flush());
                     coproto::sync_wait(Chl[i].send(Share_Seed[i]));
                     return ;
                 });
@@ -80,6 +81,7 @@ namespace volePSI
                     GCT[j] = GCT[j] ^ Share[j];
             }
 
+            coproto::sync_wait(Chl[User_Num - 2].flush());
             coproto::sync_wait(Chl[User_Num - 2].send(GCT));
 
             setTimePoint("Share Finish");
@@ -165,7 +167,9 @@ namespace volePSI
                     }
                 }
 
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
 
                 if(Thread_Num>1){
@@ -188,6 +192,7 @@ namespace volePSI
                         Re_point[i] = G * Re_point[i];
                 }
 
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].recv(Se_point));
 
                 setTimePoint("DH Finish");
@@ -229,9 +234,13 @@ namespace volePSI
 
                 for (u64 i = 0; i < User_Num - 1; ++i){
                     outputThrds[i] = std::thread([&, i]() {
+                        coproto::sync_wait(Chl[i].flush());
                         coproto::sync_wait(Chl[i].send(Size_Intersection));
                         if (!PSI_CA && Size_Intersection > 0)
+                        {
+                            coproto::sync_wait(Chl[i].flush());
                             coproto::sync_wait(Chl[i].send(Multi_Intersection));
+                        }
                         return ;
                     });
                 }
@@ -279,6 +288,7 @@ namespace volePSI
             
             for (u64 i = 0ull; i < User_Num - 1; i++){
                 recvThrds[i] = std::thread([&, i]() {
+                        coproto::sync_wait(Chl[i].flush());
                         coproto::sync_wait(Chl[i].recv(GCT[i]));
                     return ;
                 });
@@ -365,7 +375,9 @@ namespace volePSI
                     }
                 }
 
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
 
                 if(Thread_Num>1){
@@ -389,6 +401,7 @@ namespace volePSI
                         Re_point[i] = G * Re_point[i];
                 }
                 std::shuffle(Re_point.begin(),Re_point.end(),Prng_CA);
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
 
                 setTimePoint("DH Finish");
@@ -397,9 +410,11 @@ namespace volePSI
             // If there is "-BC", Pivot receives the MPSI(-CA) result from Leader's broadcast
 
             if (broadcast){
+                coproto::sync_wait(Chl[User_Num - 2].flush());
                 coproto::sync_wait(Chl[User_Num - 2].recv(Size_Intersection));
                 if (!PSI_CA && Size_Intersection > 0){
                     Multi_Intersection.resize(Size_Intersection);
+                    coproto::sync_wait(Chl[User_Num - 2].flush());
                     coproto::sync_wait(Chl[User_Num - 2].recv(Multi_Intersection));
                 }
                     
@@ -436,6 +451,7 @@ namespace volePSI
             // Receive Share_Seed[i] (i.e. Share_Seed here) from Leader P_(User_Num-1) 
 
             block Share_Seed;
+            coproto::sync_wait(Chl[0].flush());
             coproto::sync_wait(Chl[0].recv(Share_Seed));
 
             // Reconstruct OKVS "Share"
@@ -459,6 +475,7 @@ namespace volePSI
             
             // Send the new OKVS "GCT" to Pivot P_(User_Num-2) 
 
+            coproto::sync_wait(Chl[1].flush());
             coproto::sync_wait(Chl[1].send(GCT));
             
             setTimePoint("Send GCT Finish");
@@ -466,9 +483,11 @@ namespace volePSI
             // If there is "-BC", Client receives the MPSI(-CA) result from Leader's broadcast
 
             if (broadcast){
+                coproto::sync_wait(Chl[0].flush());
                 coproto::sync_wait(Chl[0].recv(Size_Intersection));
                 if (!PSI_CA && Size_Intersection > 0){
                     Multi_Intersection.resize(Size_Intersection);
+                    coproto::sync_wait(Chl[0].flush());
                     coproto::sync_wait(Chl[0].recv(Multi_Intersection));
                 }
                 setTimePoint("Receive Intersection Finish");
