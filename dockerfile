@@ -6,7 +6,7 @@ rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN git clone https://github.com/orzcy/BZS-MPSI.git
+RUN git clone https://github.com/orzcy/BZS-MPSI.git -b BAEC
 
 WORKDIR /app/BZS-MPSI
 
