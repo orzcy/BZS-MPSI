@@ -6,6 +6,7 @@
 #include <map>
 #include <future>
 #include <thread>
+#include <unordered_set>
 #include "volePSI/SimpleIndex.h"
 #include "libdivide.h"
 #include "coproto/Socket/AsioSocket.h"
@@ -14,7 +15,7 @@
 
 #define CUCKOO_HASH_NUM 3
 #define GCT_Bin_Size 1<<14
-using x25519_point = std::array<oc::u8, 32>;
+#define HASH_SEED oc::ZeroBlock
 
 namespace volePSI
 {
@@ -44,7 +45,7 @@ namespace volePSI
             std::vector<block> GCT;
             Baxos Paxos;
             u64 P_size;
-            Paxos.init(Set_Size[My_Id], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, Seed);
+            Paxos.init(Set_Size[My_Id], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
             P_size=Paxos.size();
             GCT.resize(P_size);
             Paxos.solve<block>(Inputs,Rand_Num,GCT,&Prng,1);
@@ -73,7 +74,7 @@ namespace volePSI
 
             for (auto& thrd : shareThrds) thrd.join();
 
-            for (u64 i = 0ull; i < User_Num - 1 - 1; i++){
+            for (u64 i = 0ull; i < User_Num - 2; i++){
                 PRNG Share_Prng(Share_Seed[i]);
                 Share_Prng.get<block>(Share);
                 for (u64 j = 0ull; j < P_size; j++)
@@ -99,7 +100,7 @@ namespace volePSI
 
                 RsPsiReceiver Psi_Receiver;
                 Psi_Receiver.init(Set_Size[User_Num - 2],Set_Size[My_Id],Lambda,Seed,false,Thread_Num);
-                auto p = Psi_Receiver.run(Rand_Num,Chl[User_Num -1 -1]);
+                auto p = Psi_Receiver.run(Rand_Num,Chl[User_Num - 2]);
                 auto re = macoro::sync_wait(macoro::when_all_ready(std::move(p)));
 
                 setTimePoint("2PSI Finish");  
@@ -121,102 +122,96 @@ namespace volePSI
                 // Input "Rand_Num" ( values during OKVS "GCT" Encode )
                 // Receive output "Size_Intersection", which is also the result of MPSI-CA
 
-                unsigned char point_bytes[32];  
-
-                for (u64 i = 0ull; i < 32ull ; i++)
-                    point_bytes[i]=0;
-
                 setTimePoint("2PSI-CA Begin");
 
-                PRNG Prng_CA(block(My_Id,My_Id));
-                std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size[My_Id]),Re_point(Set_Size[User_Num - 2]);
-                osuCrypto::Sodium::Scalar25519 G = osuCrypto::Sodium::Scalar25519(Prng_CA);
+                std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size[User_Num - 2]),Re_point(Set_Size[My_Id]);
+                osuCrypto::Sodium::Scalar25519 G = osuCrypto::Sodium::Scalar25519(Prng);
 
-                if(Thread_Num>1){
-                    std::vector<std::thread> Re_CA(Thread_Num);
+                if (Thread_Num > 1){
 
-                    for (u64 i = 0ull; i < Thread_Num; ++i){
-                        Re_CA[i] = std::thread([&, i]() {
+                    std::vector<std::thread> Y_beta(Thread_Num);
+
+                    for (u64 i = 0ull; i < Thread_Num; i++){
+                        Y_beta[i] = std::thread([&, i]() {
                             unsigned char Th_point_bytes[32];  
-                            for (u64 jj = 0ull; jj < 32ull ; jj++)
-                                Th_point_bytes[jj]=0;
-                            u64 Th_Length = Set_Size[My_Id]/Thread_Num;
-                            u64 Th_Begin= i*Th_Length, Th_End= (i==Thread_Num-1)?Set_Size[My_Id]:((i+1)*Th_Length);
+                            memset(Th_point_bytes,0,32);
+                            u64 Th_Begin = i * Set_Size[My_Id] / Thread_Num, Th_End = (i+1) * Set_Size[My_Id] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++){
                                 unsigned char* block_bytes = Rand_Num[j].data();
-                                for (u64 jj = 0ull; jj < 16ull; jj++)
-                                    Th_point_bytes[jj] = block_bytes[jj];
-                                Se_point[j].fromBytes(Th_point_bytes);
-                                Se_point[j] = G * Se_point[j];
+                                memcpy(Th_point_bytes, block_bytes, 16);
+                                Re_point[j].fromBytes(Th_point_bytes);
+                                Re_point[j] = G * Re_point[j];
                             }
                             return ;
                         });
                     }
 
-                    for (auto& thrd : Re_CA) thrd.join();
-                }
-                else {
-                    for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
-                        unsigned char* block_bytes = Rand_Num[i].data();
-                        for (u64 j = 0ull; j < 16ull; j++)
-                            point_bytes[j] = block_bytes[j];
-                        Se_point[i].fromBytes(point_bytes);
-                        Se_point[i] = G * Se_point[i];
-                    }
-                }
+                    for (auto& thrd : Y_beta) thrd.join();
 
-                coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
-                coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
+                    coproto::sync_wait(Chl[User_Num - 2].recv(Se_point));
+                    coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
 
-                if(Thread_Num>1){
-                    std::vector<std::thread> Re_CA_2(Thread_Num);
+                    std::vector<std::thread> X_alpha_beta(Thread_Num);
 
-                    for (u64 i = 0ull; i < Thread_Num; ++i){
-                        Re_CA_2[i] = std::thread([&, i]() {
-                            u64 Th_Length = Set_Size[User_Num - 2]/Thread_Num;
-                            u64 Th_Begin= i*Th_Length, Th_End= (i==Thread_Num-1)?Set_Size[User_Num - 2]:((i+1)*Th_Length);
+                    for (u64 i = 0ull; i < Thread_Num; i++){
+                        X_alpha_beta[i] = std::thread([&, i]() {
+                            u64 Th_Begin = i * Set_Size[User_Num - 2] / Thread_Num, Th_End = (i+1) * Set_Size[User_Num - 2] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++)
-                                Re_point[j] = G * Re_point[j];
+                                Se_point[j] = G * Se_point[j];
                             return ;
                         });
                     }
 
-                    for (auto& thrd : Re_CA_2) thrd.join();
+                    for (auto& thrd : X_alpha_beta) thrd.join();
+
+                    coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
+
                 }
                 else {
-                    for (u64 i = 0; i < Set_Size[User_Num - 2]; i++)
+
+                    unsigned char point_bytes[32];  
+                    memset(point_bytes,0,32);
+
+                    for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
+                        unsigned char* block_bytes = Rand_Num[i].data();
+                        memcpy(point_bytes, block_bytes, 16);
+                        Re_point[i].fromBytes(point_bytes);
                         Re_point[i] = G * Re_point[i];
+                    }
+
+                    coproto::sync_wait(Chl[User_Num - 2].recv(Se_point));
+                    coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
+
+                    for (u64 i = 0; i < Set_Size[User_Num - 2]; i++)
+                        Se_point[i] = G * Se_point[i];
+            
+                    coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
+                    
                 }
 
-                coproto::sync_wait(Chl[User_Num - 2].recv(Se_point));
+                setTimePoint("2PSI-CA Finish");
 
-                setTimePoint("DH Finish");
+                unsigned char point_bytes[32];  
+                memset(point_bytes,0,32);
+                std::vector<block> Se_block(Set_Size[User_Num - 2]), Re_block(Set_Size[My_Id]);
 
-                std::vector<block> Se_block(Set_Size[My_Id]), Re_block(Set_Size[User_Num - 2]);
-
-                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
+                for (u64 i = 0ull; i < Set_Size[User_Num - 2]; i++){
                     Se_point[i].toBytes(point_bytes);
                     std::memcpy(Se_block[i].data(),point_bytes,16);
                 }
-
-                for (u64 i = 0ull; i < Set_Size[User_Num - 2]; i++){
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                     Re_point[i].toBytes(point_bytes);
                     std::memcpy(Re_block[i].data(),point_bytes,16);
                 }
 
-                std::sort(Se_block.begin(),Se_block.end());
-                std::sort(Re_block.begin(),Re_block.end());
-                u64 Se_p = 0ull, Re_p = 0ull;
+                std::unordered_set<block> Re_set;
 
-                while (Se_p<Set_Size[My_Id] && Re_p<Set_Size[User_Num - 2]){
-                    if (Se_block[Se_p] == Re_block[Re_p]){
+                for (u64 i = 0; i < Set_Size[My_Id]; i++)
+                    Re_set.insert(Re_block[i]);
+
+                for (u64 i = 0; i < Set_Size[User_Num - 2]; i++)
+                    if (Re_set.find(Se_block[i]) != Re_set.end())
                         Size_Intersection++;
-                        Se_p++; Re_p++;
-                    } 
-                    else if (Se_block[Se_p] < Re_block[Re_p])
-                        Se_p++;
-                    else Re_p++;
-                }
 
                 setTimePoint("Get MPSI-CA Finish");
             }
@@ -264,9 +259,9 @@ namespace volePSI
             u64 P_size[User_Num - 1];
             for (u64 i = 0ull; i < User_Num - 1; i++){
                 if (i < User_Num - 2)
-                    Paxos[i].init(Set_Size[i], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, Seed);
+                    Paxos[i].init(Set_Size[i], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
                 else
-                    Paxos[i].init(Set_Size[i+1], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, Seed);
+                    Paxos[i].init(Set_Size[i+1], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
                 P_size[i] = Paxos[i].size();
                 GCT[i].resize(P_size[i]);
             }
@@ -320,32 +315,26 @@ namespace volePSI
             }
             else{
 
-                // Run 2-party DH-base PSI-CA with Leader P_(User_Num-1)
-                // Input "Result" ( XOR-sum of GCT[i] Decode )
+                // Run 2-party DH-based PSI-CA with Leader P_(User_Num-1)
+                // Input "Result" ( values during OKVS "GCT[0]" Decode )
 
                 setTimePoint("2PSI-CA Begin");
-                unsigned char point_bytes[32]; 
 
-                for (u64 i = 0ull; i < 32 ; i++)
-                    point_bytes[i]=0;
-
-                PRNG Prng_CA(block(My_Id,My_Id));
                 std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size[My_Id]),Re_point(Set_Size[User_Num - 1]);
-                osuCrypto::Sodium::Scalar25519 G = osuCrypto::Sodium::Scalar25519(Prng_CA);
-                if(Thread_Num>1){
-                    std::vector<std::thread> Re_CA(Thread_Num);
+                osuCrypto::Sodium::Scalar25519 G = osuCrypto::Sodium::Scalar25519(Prng);
 
-                    for (u64 i = 0ull; i < Thread_Num; ++i){
-                        Re_CA[i] = std::thread([&, i]() {
+                if (Thread_Num > 1){
+
+                    std::vector<std::thread> X_alpha(Thread_Num);
+
+                    for (u64 i = 0ull; i < Thread_Num; i++){
+                        X_alpha[i] = std::thread([&, i]() {
                             unsigned char Th_point_bytes[32];  
-                            for (u64 jj = 0ull; jj < 32ull ; jj++)
-                                Th_point_bytes[jj]=0;
-                            u64 Th_Length = Set_Size[My_Id]/Thread_Num;
-                            u64 Th_Begin= i*Th_Length, Th_End= (i==Thread_Num-1)?Set_Size[My_Id]:((i+1)*Th_Length);
+                            memset(Th_point_bytes,0,32);
+                            u64 Th_Begin = i * Set_Size[My_Id] / Thread_Num, Th_End = (i+1) * Set_Size[My_Id] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++){
                                 unsigned char* block_bytes = Result[j].data();
-                                for (u64 jj = 0ull; jj < 16ull; jj++)
-                                    Th_point_bytes[jj] = block_bytes[jj];
+                                memcpy(Th_point_bytes, block_bytes, 16);
                                 Se_point[j].fromBytes(Th_point_bytes);
                                 Se_point[j] = G * Se_point[j];
                             }
@@ -353,28 +342,16 @@ namespace volePSI
                         });
                     }
 
-                    for (auto& thrd : Re_CA) thrd.join();
-                }
-                else {
-                    for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
-                        unsigned char* block_bytes = Result[i].data();
-                        for (u64 j = 0ull; j < 16ull; j++)
-                            point_bytes[j] = block_bytes[j];
-                        Se_point[i].fromBytes(point_bytes);
-                        Se_point[i] = G * Se_point[i];
-                    }
-                }
+                    for (auto& thrd : X_alpha) thrd.join();
 
-                coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
-                coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
+                    coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
+                    coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
 
-                if(Thread_Num>1){
-                    std::vector<std::thread> Re_CA_2(Thread_Num);
+                    std::vector<std::thread> Y_alpha_beta(Thread_Num);
 
-                    for (u64 i = 0ull; i < Thread_Num; ++i){
-                        Re_CA_2[i] = std::thread([&, i]() {
-                            u64 Th_Length = Set_Size[User_Num - 1]/Thread_Num;
-                            u64 Th_Begin= i*Th_Length, Th_End= (i==Thread_Num-1)?Set_Size[User_Num - 1]:((i+1)*Th_Length);
+                    for (u64 i = 0ull; i < Thread_Num; i++){
+                        Y_alpha_beta[i] = std::thread([&, i]() {
+                            u64 Th_Begin = i * Set_Size[User_Num - 1] / Thread_Num, Th_End = (i+1) * Set_Size[User_Num - 1] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++){
                                 Re_point[j] = G * Re_point[j];
                             }
@@ -382,16 +359,35 @@ namespace volePSI
                         });
                     }
 
-                    for (auto& thrd : Re_CA_2) thrd.join();
+                    for (auto& thrd : Y_alpha_beta) thrd.join();
+
+                    std::shuffle(Re_point.begin(),Re_point.end(),Prng);
+                    coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
+
                 }
                 else {
+
+                    unsigned char point_bytes[32]; 
+                    memset(point_bytes,0,32);
+
+                    for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
+                        unsigned char* block_bytes = Result[i].data();
+                        memcpy(point_bytes, block_bytes, 16);
+                        Se_point[i].fromBytes(point_bytes);
+                        Se_point[i] = G * Se_point[i];
+                    }
+
+                    coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
+                    coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
+
                     for (u64 i = 0; i < Set_Size[User_Num - 1]; i++)
                         Re_point[i] = G * Re_point[i];
+                    
+                    std::shuffle(Re_point.begin(),Re_point.end(),Prng);
+                    coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
                 }
-                std::shuffle(Re_point.begin(),Re_point.end(),Prng_CA);
-                coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
 
-                setTimePoint("DH Finish");
+                setTimePoint("2PSI-CA Finish");
             }
 
             // If there is "-BC", Pivot receives the MPSI(-CA) result from Leader's broadcast
@@ -427,9 +423,9 @@ namespace volePSI
 
             Baxos Paxos_De,Paxos_En;
             u64 P_size_De,P_size_En;
-            Paxos_De.init(Set_Size[User_Num - 1], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, Seed);
+            Paxos_De.init(Set_Size[User_Num - 1], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
             P_size_De=Paxos_De.size();
-            Paxos_En.init(Set_Size[My_Id], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, Seed);
+            Paxos_En.init(Set_Size[My_Id], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
             P_size_En=Paxos_En.size();
             std::vector<block> GCT(P_size_En), Share(P_size_De);
 

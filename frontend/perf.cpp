@@ -525,8 +525,8 @@ void perfMpsi_User(oc::CLP& cmd)
 	u64 Lambda = cmd.getOr("la", 40ull);
 	u64 Thread_Num = cmd.getOr("nt", 1);
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);
-	bool broadcast = cmd.isSet("bc");
 	bool PSI_CA = cmd.isSet("ca");
+	bool broadcast = cmd.isSet("bc");
 	std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
 	std::vector<Socket> Chl;
@@ -564,7 +564,8 @@ void perfMpsi_User(oc::CLP& cmd)
 		Chl[1] = coproto::asioConnect(exip, false);
 	}
 
-	PRNG prng(toBlock(My_Id));
+	block Seed=block(My_Id, My_Id);
+	PRNG prng(Seed);
 
 	if (My_Id == User_Num - 1)
 		std::cout << "Mpsi_Tests:" << std::endl \
@@ -583,7 +584,6 @@ void perfMpsi_User(oc::CLP& cmd)
 
 	Mpsi_User User;
 	Timer time, timer;
-	block Seed=ZeroBlock;
 	User.setTimer(timer);
 	time.setTimePoint("start");
 	User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);

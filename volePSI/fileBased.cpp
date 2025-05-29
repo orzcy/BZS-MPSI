@@ -2,6 +2,7 @@
 #include "cryptoTools/Crypto/RandomOracle.h"
 #include "RsPsi.h"
 #include "fbMpsi.h"
+#include <unordered_set>
 
 #include "coproto/Socket/AsioSocket.h"
 
@@ -509,6 +510,9 @@ namespace volePSI
             while (std::getline(file, buffer))
                 User_Set.push_back(hexToBlock(buffer));
 
+            std::unordered_set<block> Unique_Set(User_Set.begin(), User_Set.end());
+            User_Set.assign(Unique_Set.begin(), Unique_Set.end());
+
             // "synchronize" Set_Size
             // unlike the benchmark, different participants may have different set sizes in real-life scenarios
 
@@ -555,7 +559,7 @@ namespace volePSI
             
             // run a participant in BZS-MPSI (/volepsi/fbMpsi.cpp)
 
-            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, osuCrypto::ZeroBlock, User_Set, Chl, PSI_CA, broadcast);
+            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);
 
             // write output to file
 

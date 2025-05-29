@@ -60,7 +60,7 @@ namespace
                 prng.get<block>(User_Set);
                 for (u64 j=0ull; j<Test_Size; j++)
                     User_Set[(j+ii)%Set_Size]=toBlock(j);
-                block Seed=ZeroBlock;
+                block Seed=block(ii,ii);
                 User[ii].run(User_Num, ii, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);
 				for (u64 i = 0ull; i < Chl_Num; i++)
 					coproto::sync_wait(Chl[i].close());
