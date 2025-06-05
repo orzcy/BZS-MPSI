@@ -7,6 +7,7 @@
 #include <future>
 #include <thread>
 #include <unordered_set>
+#include <unordered_map>
 #include "volePSI/SimpleIndex.h"
 #include "libdivide.h"
 #include "coproto/Socket/AsioSocket.h"
@@ -24,7 +25,7 @@ namespace volePSI
     // Each parties P_i holds a dataset "Inputs" of size "Set_Size"
     // They want to compute the intersection "Multi_Intersection" of their sets without revealing any additional information
 
-    void fbMpsi_User::run(u64 User_Num, u64 My_Id, u64 Set_Size[], u64 Lambda, u64 Thread_Num, block Seed, std::vector<block> Inputs, std::vector<Socket> Chl, bool PSI_CA, bool broadcast){
+    void fbMpsi_User::run(u64 User_Num, u64 My_Id, u64 Set_Size[], u64 Lambda, u64 Thread_Num, block Seed, std::vector<block> Inputs, std::vector<Socket> Chl, bool PSI_CA, bool broadcast, bool Mal){
 
         setTimePoint("Start");
           
@@ -35,6 +36,20 @@ namespace volePSI
         // Client  : Id = [0,User_Num - 3]
 
         if (My_Id == User_Num - 1){
+
+            std::unordered_map<block,block> RO_Map;
+
+            if (Mal){
+                oc::RandomOracle RO(sizeof(block));
+                block RO_Result;
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
+                    RO.Reset();
+                    RO.Update(Inputs[i].data(), sizeof(block));
+                    RO.Final(RO_Result);
+                    RO_Map.insert(std::make_pair(RO_Result, Inputs[i]));
+                    Inputs[i] = RO_Result;
+                }
+            }
 
             // Init & Encode OKVS "GCT"
             // GCT = Encode ( { (Input[i], Rand_Num[i]) } ) 
@@ -99,7 +114,7 @@ namespace volePSI
                 // Then the MPSI result "Multi_Intersection" are all Inputs[x] 
 
                 RsPsiReceiver Psi_Receiver;
-                Psi_Receiver.init(Set_Size[User_Num - 2],Set_Size[My_Id],Lambda,Seed,false,Thread_Num);
+                Psi_Receiver.init(Set_Size[User_Num - 2],Set_Size[My_Id],Lambda,Seed,Mal,Thread_Num);
                 auto p = Psi_Receiver.run(Rand_Num,Chl[User_Num - 2]);
                 auto re = macoro::sync_wait(macoro::when_all_ready(std::move(p)));
 
@@ -110,8 +125,10 @@ namespace volePSI
 
                 for (u64 i = 0ull; i < Size_Intersection; i++)
                     Multi_Intersection.push_back(Inputs[Psi_Receiver.mIntersection[i]]);
-
-                Size_Intersection = Multi_Intersection.size();
+                
+                if (Mal)
+                    for (u64 i = 0ull; i < Size_Intersection; i++)
+                        Multi_Intersection[i] = RO_Map[Multi_Intersection[i]];
 
                 setTimePoint("Get Intersection Finish");
 
@@ -251,6 +268,15 @@ namespace volePSI
         else if (My_Id == User_Num - 2)
         {
                         
+            if (Mal){
+                oc::RandomOracle RO(sizeof(block));
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
+                    RO.Reset();
+                    RO.Update(Inputs[i].data(), sizeof(block));
+                    RO.Final(Inputs[i]);
+                }
+            }
+
             // Init OKVS "GCT[i]" i = [0, User_Num-2]
             // "P_size[i]" is the size of GCT[i] i = [0, User_Num-2]
 
@@ -306,7 +332,7 @@ namespace volePSI
                 // Input "Result" ( XOR-sum of GCT[i] Decode )
 
                 RsPsiSender Psi_Sender;
-                Psi_Sender.init(Set_Size[My_Id],Set_Size[User_Num - 1],Lambda,Seed,false,Thread_Num);
+                Psi_Sender.init(Set_Size[My_Id],Set_Size[User_Num - 1],Lambda,Seed,Mal,Thread_Num);
                 auto p = Psi_Sender.run(Result, Chl[User_Num - 2]);
                 auto re = macoro::sync_wait(macoro::when_all_ready(std::move(p)));
  
@@ -416,6 +442,15 @@ namespace volePSI
 
         else
         {
+            
+            if (Mal){
+                oc::RandomOracle RO(sizeof(block));
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
+                    RO.Reset();
+                    RO.Update(Inputs[i].data(), sizeof(block));
+                    RO.Final(Inputs[i]);
+                }
+            }
 
             // Init OKVS "GCT" & "Share" 
             // "P_size_En" is the size of GCT

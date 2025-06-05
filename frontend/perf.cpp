@@ -527,6 +527,7 @@ void perfMpsi_User(oc::CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);
 	bool PSI_CA = cmd.isSet("ca");
 	bool broadcast = cmd.isSet("bc");
+	bool Mal = cmd.isSet("ma");
 	std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
 	std::vector<Socket> Chl;
@@ -586,7 +587,7 @@ void perfMpsi_User(oc::CLP& cmd)
 	Timer time, timer;
 	User.setTimer(timer);
 	time.setTimePoint("start");
-	User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);
+	User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast, Mal);
 	time.setTimePoint("end");
 
 	// output at the terminal

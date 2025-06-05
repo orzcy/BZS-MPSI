@@ -17,7 +17,7 @@ using coproto::LocalAsyncSocket;
 
 namespace
 {
-    Mpsi_User run(u64 User_Num, u64 Set_Size, u64 Lambda, u64 Thread_Num, u64 Test_Size, bool PSI_CA, bool broadcast,  std::string ipp, std::string ipl)
+    Mpsi_User run(u64 User_Num, u64 Set_Size, u64 Lambda, u64 Thread_Num, u64 Test_Size, bool PSI_CA, bool broadcast, bool Mal ,std::string ipp, std::string ipl)
     {
         std::vector<Mpsi_User> User(User_Num);
         std::vector<std::thread> Thrds(User_Num);
@@ -61,16 +61,19 @@ namespace
                 for (u64 j=0ull; j<Test_Size; j++)
                     User_Set[(j+ii)%Set_Size]=toBlock(j);
                 block Seed=block(ii,ii);
-                User[ii].run(User_Num, ii, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);
+                User[ii].run(User_Num, ii, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast, Mal);
 				for (u64 i = 0ull; i < Chl_Num; i++)
 					coproto::sync_wait(Chl[i].close());
                 return ;
             });
         }
 
-    for (auto& thrd : Thrds) thrd.join();
+		for (auto& thrd : Thrds) thrd.join();
 
-    return User[User_Num - 1];
+		if (broadcast)
+			return User[1];
+		else
+			return User[User_Num - 1];
     }
 }
 
@@ -86,10 +89,11 @@ void MPSI_3Party_Empty_Test(const CLP& cmd)
 	u64 Test_Size = 0;  //empty test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=0) //empty test
         throw RTE_LOC;
@@ -106,10 +110,11 @@ void MPSI_3Party_Partial_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -125,10 +130,11 @@ void MPSI_3Party_Full_Test(const CLP& cmd)
 	u64 Test_Size = Set_Size;  //full test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Set_Size) //full test
         throw RTE_LOC;
@@ -145,10 +151,11 @@ void MPSI_3Party_Mthreads_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -165,10 +172,11 @@ void MPSI_3Party_Cardinality_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = true;  //yes ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Size_Intersection!=Test_Size) //partial test
         throw RTE_LOC;
@@ -185,10 +193,32 @@ void MPSI_3Party_Broadcast_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = true; //yes bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
+
+    if (inter.Multi_Intersection.size()!=Test_Size) //partial test
+        throw RTE_LOC;
+}
+
+void MPSI_3Party_Malicious_Test(const CLP& cmd)
+{
+    
+	u64 User_Num = 3ull; //3 party
+	// u64 ii = cmd.getOr("id", User_Num - 1);
+	u64 Set_Size =  1ull << cmd.getOr("nn", 10);
+	u64 Lambda = cmd.getOr("la", 40ull);
+	u64 Thread_Num = 1; //single thread
+	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
+	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
+	bool Mal = true; //yes malicious
+    std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
+	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
+    
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -205,10 +235,11 @@ void MPSI_5Party_Empty_Test(const CLP& cmd)
 	u64 Test_Size = 0;  //empty test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=0) //empty test
         throw RTE_LOC;
@@ -225,10 +256,11 @@ void MPSI_5Party_Partial_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -244,10 +276,11 @@ void MPSI_5Party_Full_Test(const CLP& cmd)
 	u64 Test_Size = Set_Size;  //full test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Set_Size) //full test
         throw RTE_LOC;
@@ -264,10 +297,11 @@ void MPSI_5Party_Mthreads_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;
@@ -284,10 +318,11 @@ void MPSI_5Party_Cardinality_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = true;  //yes ca
 	bool broadcast = false; //no bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Size_Intersection!=Test_Size) //partial test
         throw RTE_LOC;
@@ -304,10 +339,32 @@ void MPSI_5Party_Broadcast_Test(const CLP& cmd)
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
 	bool PSI_CA = false;  //no ca
 	bool broadcast = true; //yes bc
+	bool Mal = false; //no malicious
     std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
 	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
     
-    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, ipp, ipl);
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
+
+    if (inter.Multi_Intersection.size()!=Test_Size) //partial test
+        throw RTE_LOC;
+}
+
+void MPSI_5Party_Malicious_Test(const CLP& cmd)
+{
+    
+	u64 User_Num = 5ull; //5 party
+	// u64 ii = cmd.getOr("id", User_Num - 1);
+	u64 Set_Size =  1ull << cmd.getOr("nn", 10);
+	u64 Lambda = cmd.getOr("la", 40ull);
+	u64 Thread_Num = 1; //single thread
+	u64 Test_Size = cmd.getOr("ts", Set_Size/10);  //partial test
+	bool PSI_CA = false;  //no ca
+	bool broadcast = false; //no bc
+	bool Mal = true; //yes malicious
+    std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
+	std::string ipl = cmd.getOr<std::string>("ipl", "localhost");
+    
+    auto inter = run(User_Num, Set_Size, Lambda, Thread_Num, Test_Size, PSI_CA, broadcast, Mal, ipp, ipl);
 
     if (inter.Multi_Intersection.size()!=Test_Size) //partial test
         throw RTE_LOC;

@@ -102,12 +102,14 @@ namespace MPSI_Tests
         t.add("MPSI_3Party_Mthreads_Test   ", MPSI_3Party_Mthreads_Test);
         t.add("MPSI_3Party_Cardinality_Test", MPSI_3Party_Cardinality_Test);
         t.add("MPSI_3Party_Broadcast_Test  ", MPSI_3Party_Broadcast_Test);
-        t.add("MPSI_3Party_Empty_Test      ", MPSI_5Party_Empty_Test);
+        t.add("MPSI_3Party_Malicious_Test  ", MPSI_3Party_Malicious_Test);
+        t.add("MPSI_5Party_Empty_Test      ", MPSI_5Party_Empty_Test);
         t.add("MPSI_5Party_Partial_Test    ", MPSI_5Party_Partial_Test);
         t.add("MPSI_5Party_Full_Test       ", MPSI_5Party_Full_Test);
         t.add("MPSI_5Party_Mthreads_Test   ", MPSI_5Party_Mthreads_Test);
         t.add("MPSI_5Party_Cardinality_Test", MPSI_5Party_Cardinality_Test);
         t.add("MPSI_5Party_Broadcast_Test  ", MPSI_5Party_Broadcast_Test);
+        t.add("MPSI_5Party_Malicious_Test  ", MPSI_5Party_Malicious_Test);
 
     });
 }

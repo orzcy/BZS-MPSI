@@ -443,6 +443,8 @@ namespace volePSI
             u64 Thread_Num = cmd.getOr("nt", 1ull);
             bool broadcast = cmd.isSet("bc");
             bool PSI_CA = cmd.isSet("ca");
+            bool Mal = cmd.isSet("ma");
+            bool Need_Unique = cmd.isSet("un");
 
             std::string ipp = cmd.get<std::string>("ipp");
             std::string ipl = cmd.get<std::string>("ipl");
@@ -507,11 +509,17 @@ namespace volePSI
             if (file.is_open() == false)
                 throw std::runtime_error("failed to open file: " + inpath);
             std::string buffer;
-            while (std::getline(file, buffer))
-                User_Set.push_back(hexToBlock(buffer));
+            while (std::getline(file, buffer)){
+                if (buffer.length() > 32)
+                    buffer = buffer.substr(0,32);
+                if (isHexBlock(buffer))
+                    User_Set.push_back(hexToBlock(buffer));
+            }
 
-            std::unordered_set<block> Unique_Set(User_Set.begin(), User_Set.end());
-            User_Set.assign(Unique_Set.begin(), Unique_Set.end());
+            if (Need_Unique){
+                std::unordered_set<block> Unique_Set(User_Set.begin(), User_Set.end());
+                User_Set.assign(Unique_Set.begin(), Unique_Set.end());
+            }
 
             // "synchronize" Set_Size
             // unlike the benchmark, different participants may have different set sizes in real-life scenarios
@@ -559,7 +567,7 @@ namespace volePSI
             
             // run a participant in BZS-MPSI (/volepsi/fbMpsi.cpp)
 
-            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast);
+            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast, Mal);
 
             // write output to file
 
