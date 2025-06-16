@@ -264,10 +264,10 @@ namespace volePSI
             // Then evalate the surface at out bin,ball coordinate.
             if (numBinsHgh < sizes.size() && numBallsHgh < sizes[numBinsHgh].size())
             {
-                auto a0 = (diffBin)*sizes[numBinsLow][numBallsLow] + (1 - diffBin) * sizes[numBinsLow][numBallsHgh];
-                auto a1 = (diffBin)*sizes[numBinsHgh][numBallsLow] + (1 - diffBin) * sizes[numBinsHgh][numBallsHgh];
+                auto a0 = (diffBall)*sizes[numBinsLow][numBallsLow] + (1 - diffBall) * sizes[numBinsLow][numBallsHgh];
+                auto a1 = (diffBall)*sizes[numBinsHgh][numBallsLow] + (1 - diffBall) * sizes[numBinsHgh][numBallsHgh];
 
-                auto b0 = (diffBall)*a0 + (1 - diffBall) * a1;
+                auto b0 = (diffBin) * a0 + (1 - diffBin) * a1;
 
                 auto B = std::ceil(std::pow(2, b0));
 
@@ -309,7 +309,7 @@ namespace volePSI
         }
 
         // std::cout << "binsize " << numBins << " " << numBalls << " " << statSecParam  << " -> " << B << std::endl;
-        // std::cout << numBins << " " << numBalls << " " << B << std::endl;
+        std::cout << "get bin size:" << B << std::endl;
 
         return B;
     }

@@ -42,6 +42,7 @@ namespace volePSI
 
 	void doFilePSI(const oc::CLP& cmd);
 	void doFileMPSI(const oc::CLP& cmd);
+	void doFilePSU(const oc::CLP& cmd);
 
 	inline
 		bool exist(std::string path)

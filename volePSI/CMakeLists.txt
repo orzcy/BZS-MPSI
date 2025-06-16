@@ -9,6 +9,7 @@ set(SRCS
     "fileBased.cpp"
     "Mpsi.cpp"
     "fbMpsi.cpp"
+    "RpmtPsu.cpp"
     )
 
 if(VOLE_PSI_ENABLE_GMW)

@@ -20,6 +20,10 @@ int main(int argc, char** argv)
         {
             volePSI::doFileMPSI(cmd);
         }
+        else if (cmd.isSet("psu"))
+        {
+            volePSI::doFilePSU(cmd);
+        }
         else 
         {
             volePSI::doFilePSI(cmd);

@@ -2,6 +2,7 @@
 #include "cryptoTools/Crypto/RandomOracle.h"
 #include "RsPsi.h"
 #include "fbMpsi.h"
+#include "RpmtPsu.h"
 #include <unordered_set>
 
 #include "coproto/Socket/AsioSocket.h"
@@ -597,4 +598,106 @@ namespace volePSI
         return ;
     }
 
+    void doFilePSU(const oc::CLP& cmd)
+    {
+        try{
+
+            // init
+
+            RpmtPsu_User User;
+            auto inpath = cmd.get<std::string>("in");
+            auto outPath = cmd.getOr<std::string>("out", inpath + ".out");
+            bool My_Role = cmd.getOr("r", true);
+            u64 Lambda = cmd.getOr("la", 40ull);
+            u64 Thread_Num = cmd.getOr("nt", 1ull);
+
+            std::string ip = cmd.get<std::string>("ip");
+
+            Socket Chl;
+            Chl = coproto::asioConnect(ip, My_Role);
+
+            block Seed;
+            if (cmd.hasValue("seed"))
+            {
+                auto seedStr = cmd.get<std::string>("seed");
+                oc::RandomOracle ro(sizeof(block));
+                ro.Update(seedStr.data(), seedStr.size());
+                ro.Final(Seed);
+            }
+            else
+                Seed = oc::sysRandomSeed();
+
+            // read input from file
+
+            FileType ft = FileType::Unspecified;
+            if (hasSuffix(inpath, ".csv"))
+                ft = FileType::Csv;
+            if (ft != FileType::Csv)
+                throw std::runtime_error("unknown file extension, must be .csv .");
+
+            std::ifstream file(inpath, std::ios::in);
+            if (file.is_open() == false)
+                throw std::runtime_error("failed to open file: " + inpath);
+            
+            std::vector<std::string> User_Set;
+            std::string buffer;
+            u64 Sender_Max_Length = 0ull;
+
+            while (std::getline(file, buffer)){
+                User_Set.push_back(buffer);
+                if (My_Role ==0 && buffer.length() > Sender_Max_Length)
+                    Sender_Max_Length = buffer.length();
+            }
+                
+            // "synchronize" Set_Size
+
+            u64 Sender_Set_Size,Receiver_Set_Size;
+
+            if (My_Role == 1){
+                
+                Receiver_Set_Size = User_Set.size();
+                coproto::sync_wait(Chl.recv(Sender_Set_Size));
+                coproto::sync_wait(Chl.send(Receiver_Set_Size));
+                coproto::sync_wait(Chl.recv(Sender_Max_Length));
+
+            }
+            else {
+
+                Sender_Set_Size = User_Set.size();
+                coproto::sync_wait(Chl.send(Sender_Set_Size));
+                coproto::sync_wait(Chl.recv(Receiver_Set_Size));
+                coproto::sync_wait(Chl.send(Sender_Max_Length));
+            }
+
+            // run a participant in PSU (/volepsi/RpmtPsu.cpp)
+
+            User.run(My_Role, Sender_Set_Size, Receiver_Set_Size, Sender_Max_Length, Lambda, Thread_Num, Seed, User_Set, Chl);
+
+            // write output to file
+
+            if (My_Role == 1){
+                std::ofstream dest;
+                u64 Block_Num = ((Sender_Max_Length + 15ull) / 16) + 1ull, Output_Length;
+                char Output_Char;
+                dest.open(outPath, std::ios::trunc | std::ios::out);
+                for (u64 i = 0ull; i < User.Size_Different; i++){
+                    Output_Length = User.Different[i*Block_Num].mData[0];
+                    for (u64 j = 0ull; j < Output_Length; j++){
+                        Output_Char = (char) ((User.Different[i*Block_Num+1+j/16].mData[1-(j%16)/8] >> ((7-(j%8))*8))) & ((1<<8)-1);
+                        dest << Output_Char;
+                    }
+                    dest << std::endl;
+                }
+                dest.close();     
+            } 
+
+		    coproto::sync_wait(Chl.close());
+
+        }
+        catch (std::exception& e)
+        {
+            std::cout << oc::Color::Red << "Exception: " << e.what() << std::endl << oc::Color::Default;
+        }
+        return ;
+    }
 }
