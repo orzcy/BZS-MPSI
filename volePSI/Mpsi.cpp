@@ -1,3 +1,4 @@
+#include "fileBased.h"
 #include "Mpsi.h"
 #include "volePSI/RsPsi.h"
 #include "volePSI/RsOprf.h"
@@ -6,6 +7,7 @@
 #include <future>
 #include <thread>
 #include <unordered_set>
+#include <unordered_map>
 #include "volePSI/SimpleIndex.h"
 #include "libdivide.h"
 #include "coproto/Socket/AsioSocket.h"
@@ -18,31 +20,31 @@
 
 namespace volePSI
 {
-    // Run a participant in benchmark
+    // Run a participant in BZS-MPSI
     // In MPSI, there are "User_Num" ( User_Num > 2 ) parties
     // Each parties P_i holds a dataset "Inputs" of size "Set_Size"
     // They want to compute the intersection "Multi_Intersection" of their sets without revealing any additional information
 
-    void Mpsi_User::run(u64 User_Num, u64 My_Id, u64 Set_Size, u64 Lambda, u64 Thread_Num, block Seed, std::vector<block> Inputs, std::vector<Socket> Chl, bool PSI_CA, bool broadcast, bool Mal){
-
-        PRNG Prng(Seed);
-        Baxos Paxos;
-        u64 P_size;
+    void Mpsi_User::run(u64 User_Num, u64 My_Id, u64 Set_Size[], u64 Lambda, u64 Thread_Num, block Seed, std::vector<block> Inputs, std::vector<Socket> Chl, bool PSI_CA, bool Circuit, bool broadcast, bool Mal){
 
         setTimePoint("Start");
-  
+          
+        PRNG Prng(Seed);
+
         // *Leader : Id = User_Num - 1 
         // Pivot   : Id = User_Num - 2
         // Client  : Id = [0,User_Num - 3]
 
         if (My_Id == User_Num - 1){
 
+            // In malicious model, Inputs must to be replaced with RO(Inputs)
+
             std::unordered_map<block,block> RO_Map;
 
             if (Mal){
                 oc::RandomOracle RO(sizeof(block));
                 block RO_Result;
-                for (u64 i = 0ull; i < Set_Size; i++){
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                     RO.Reset();
                     RO.Update(Inputs[i].data(), sizeof(block));
                     RO.Final(RO_Result);
@@ -51,23 +53,21 @@ namespace volePSI
                 }
             }
 
-            // Encode OKVS "GCT"
+            // Init & Encode OKVS "GCT"
             // GCT = Encode ( { (Input[i], Rand_Num[i]) } ) 
             // "P_size" is the size of GCT
 
-            std::vector<block> Rand_Num(Set_Size);
+            std::vector<block> Rand_Num(Set_Size[My_Id]);
             Prng.get<block>(Rand_Num);
             std::vector<block> GCT;
-            Paxos.init(Set_Size, GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
+            Baxos Paxos;
+            u64 P_size;
+            Paxos.init(Set_Size[My_Id], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
             P_size=Paxos.size();
             GCT.resize(P_size);
             Paxos.solve<block>(Inputs,Rand_Num,GCT,&Prng,1);
 
             setTimePoint("GCT Finish");
-
-            std::vector<block> Share_Seed(User_Num - 1);
-            Prng.get<block>(Share_Seed);
-            std::vector<block> Share(P_size);
 
             // Share & Send OKVS "GCT"
             // Share[i] = PRG ( Share_Seed[i] )  i = [0,User_Num-3]
@@ -75,6 +75,10 @@ namespace volePSI
             // i.e. " GCT = GCT ^ Share " in the code
             // Send Share_Seed[i]     to Client P_i  i = [0,User_Num-3]
             // Send Share[User_Num-2] to Pivot  P_(User_Num-2) 
+            
+            std::vector<block> Share_Seed(User_Num - 2);
+            Prng.get<block>(Share_Seed);
+            std::vector<block> Share(P_size);
 
             std::vector<std::thread> shareThrds(User_Num - 2);
 
@@ -87,7 +91,7 @@ namespace volePSI
 
             for (auto& thrd : shareThrds) thrd.join();
 
-            for (u64 i = 0ull; i < User_Num -2; i++){
+            for (u64 i = 0ull; i < User_Num - 2; i++){
                 PRNG Share_Prng(Share_Seed[i]);
                 Share_Prng.get<block>(Share);
                 for (u64 j = 0ull; j < P_size; j++)
@@ -97,13 +101,12 @@ namespace volePSI
             coproto::sync_wait(Chl[User_Num - 2].send(GCT));
 
             setTimePoint("Share Finish");
-            
+        
             // If there is "-CA", only output the intersection size (MPSI-CA) 
             // Otherwise, output the complete intersection (Standard MPSI)
 
-            if (!PSI_CA)
+            if (!PSI_CA && !Circuit)
             {
-                setTimePoint("2PSI Begin");
 
                 // Invoke 2-party PSI with Pivot P_(User_Num-2)
                 // Input "Rand_Num" ( values during OKVS "GCT" Encode )
@@ -111,8 +114,10 @@ namespace volePSI
                 // "Psi_Receiver.mIntersection[] = x" means that the x-th element of Rand_Num ( i.e. Rand_Num[x] ) is in the 2-party PSI result
                 // Then the MPSI result "Multi_Intersection" are all Inputs[x] 
 
+                setTimePoint("2PSI Begin");
+
                 RsPsiReceiver Psi_Receiver;
-                Psi_Receiver.init(Set_Size,Set_Size,Lambda,Seed,Mal,Thread_Num);
+                Psi_Receiver.init(Set_Size[User_Num - 2],Set_Size[My_Id],Lambda,Seed,Mal,Thread_Num);
                 auto p = Psi_Receiver.run(Rand_Num,Chl[User_Num - 2]);
                 auto re = macoro::sync_wait(macoro::when_all_ready(std::move(p)));
 
@@ -123,7 +128,7 @@ namespace volePSI
 
                 for (u64 i = 0ull; i < Size_Intersection; i++)
                     Multi_Intersection.push_back(Inputs[Psi_Receiver.mIntersection[i]]);
-
+                
                 if (Mal)
                     for (u64 i = 0ull; i < Size_Intersection; i++)
                         Multi_Intersection[i] = RO_Map[Multi_Intersection[i]];
@@ -131,7 +136,7 @@ namespace volePSI
                 setTimePoint("Get Intersection Finish");
 
             }
-            else{
+            else if (PSI_CA && !Circuit){
 
                 // Run 2-party DH-based PSI-CA with Pivot P_(User_Num-2) to achieve MPSI-CA
                 // Input "Rand_Num" ( values during OKVS "GCT" Encode )
@@ -139,7 +144,7 @@ namespace volePSI
 
                 setTimePoint("2PSI-CA Begin");
 
-                std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size),Re_point(Set_Size);
+                std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size[User_Num - 2]),Re_point(Set_Size[My_Id]);
                 osuCrypto::Sodium::Scalar25519 G = osuCrypto::Sodium::Scalar25519(Prng);
 
                 if (Thread_Num > 1){
@@ -150,7 +155,7 @@ namespace volePSI
                         Y_beta[i] = std::thread([&, i]() {
                             unsigned char Th_point_bytes[32];  
                             memset(Th_point_bytes,0,32);
-                            u64 Th_Begin = i * Set_Size / Thread_Num, Th_End = (i+1) * Set_Size / Thread_Num;
+                            u64 Th_Begin = i * Set_Size[My_Id] / Thread_Num, Th_End = (i+1) * Set_Size[My_Id] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++){
                                 unsigned char* block_bytes = Rand_Num[j].data();
                                 memcpy(Th_point_bytes, block_bytes, 16);
@@ -170,7 +175,7 @@ namespace volePSI
 
                     for (u64 i = 0ull; i < Thread_Num; i++){
                         X_alpha_beta[i] = std::thread([&, i]() {
-                            u64 Th_Begin = i * Set_Size / Thread_Num, Th_End = (i+1) * Set_Size / Thread_Num;
+                            u64 Th_Begin = i * Set_Size[User_Num - 2] / Thread_Num, Th_End = (i+1) * Set_Size[User_Num - 2] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++)
                                 Se_point[j] = G * Se_point[j];
                             return ;
@@ -187,7 +192,7 @@ namespace volePSI
                     unsigned char point_bytes[32];  
                     memset(point_bytes,0,32);
 
-                    for (u64 i = 0ull; i < Set_Size; i++){
+                    for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                         unsigned char* block_bytes = Rand_Num[i].data();
                         memcpy(point_bytes, block_bytes, 16);
                         Re_point[i].fromBytes(point_bytes);
@@ -197,7 +202,7 @@ namespace volePSI
                     coproto::sync_wait(Chl[User_Num - 2].recv(Se_point));
                     coproto::sync_wait(Chl[User_Num - 2].send(Re_point));
 
-                    for (u64 i = 0; i < Set_Size; i++)
+                    for (u64 i = 0; i < Set_Size[User_Num - 2]; i++)
                         Se_point[i] = G * Se_point[i];
             
                     coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
@@ -208,27 +213,41 @@ namespace volePSI
 
                 unsigned char point_bytes[32];  
                 memset(point_bytes,0,32);
-                std::vector<block> Se_block(Set_Size), Re_block(Set_Size);
+                std::vector<block> Se_block(Set_Size[User_Num - 2]), Re_block(Set_Size[My_Id]);
 
-                for (u64 i = 0ull; i < Set_Size; i++){
+                for (u64 i = 0ull; i < Set_Size[User_Num - 2]; i++){
                     Se_point[i].toBytes(point_bytes);
                     std::memcpy(Se_block[i].data(),point_bytes,16);
                 }
-                for (u64 i = 0ull; i < Set_Size; i++){
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                     Re_point[i].toBytes(point_bytes);
                     std::memcpy(Re_block[i].data(),point_bytes,16);
                 }
 
                 std::unordered_set<block> Re_set;
 
-                for (u64 i = 0; i < Set_Size; i++)
+                for (u64 i = 0; i < Set_Size[My_Id]; i++)
                     Re_set.insert(Re_block[i]);
 
-                for (u64 i = 0; i < Set_Size; i++)
+                for (u64 i = 0; i < Set_Size[User_Num - 2]; i++)
                     if (Re_set.find(Se_block[i]) != Re_set.end())
                         Size_Intersection++;
 
                 setTimePoint("Get MPSI-CA Finish");
+            }
+            else if (!PSI_CA && Circuit){
+
+                //Invoke 2-party Circuit PSI with Pivot P_(User_Num-2)
+                
+                setTimePoint("2CPSI Begin");
+                
+                RsCpsiReceiver Cpsi_Receiver;
+                Cpsi_Receiver.init(Set_Size[User_Num - 2],Set_Size[My_Id],sizeof(block),Lambda,Seed,Thread_Num);
+                auto p = Cpsi_Receiver.receive(Rand_Num,Receiver_Cpsi_Results,Chl[User_Num -2]);
+                auto re = macoro::sync_wait(macoro::when_all_ready(std::move(p)));        
+
+                setTimePoint("2CPSI Finish");  
+
             }
 
             // If there is "-BC", Leader broadcasts the MPSI(-CA) result to all parties
@@ -265,38 +284,38 @@ namespace volePSI
 
         else if (My_Id == User_Num - 2)
         {
-
+                        
             if (Mal){
                 oc::RandomOracle RO(sizeof(block));
-                for (u64 i = 0ull; i < Set_Size; i++){
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                     RO.Reset();
                     RO.Update(Inputs[i].data(), sizeof(block));
                     RO.Final(Inputs[i]);
                 }
             }
- 
-            // Init OKVS "GCT" 
-            // "P_size" is the size of GCT
+
+            // Init OKVS "GCT[i]" i = [0, User_Num-2]
+            // "P_size[i]" is the size of GCT[i] i = [0, User_Num-2]
 
             std::vector<std::vector<block>> GCT(User_Num - 1);
-            Paxos.init(Set_Size, GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
-            P_size=Paxos.size();
+            Baxos Paxos[User_Num - 1];
+            u64 P_size[User_Num - 1];
+            for (u64 i = 0ull; i < User_Num - 1; i++){
+                if (i < User_Num - 2)
+                    Paxos[i].init(Set_Size[i], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
+                else
+                    Paxos[i].init(Set_Size[i+1], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
+                P_size[i] = Paxos[i].size();
+                GCT[i].resize(P_size[i]);
+            }
 
-            GCT[User_Num - 2].resize(P_size);
+            // Receive OKVS "Share[User_Num-2]" (i.e. GCT[User_Num-2] here) from Leader P_(User_Num-1) & OKVS "GCT" (i.e. GCT[i] here) from Client P_i  i = [0, User_Num-3]
 
-            // Receive OKVS "Share[User_Num-2]" (i.e. GCT[User_Num-2] here) from Leader P_(User_Num-1) 
-
-            coproto::sync_wait(Chl[User_Num - 2].recv(GCT[User_Num - 2]));
+            std::vector<std::thread> recvThrds(User_Num - 1);
             
-            // Receive OKVS "GCT" (i.e. GCT[i] here) from Client P_i  i = [0, User_Num-3]
-
-            std::vector<block> Result(Set_Size);
-            std::vector<std::thread> recvThrds(User_Num - 2);
-            
-            for (u64 i = 0ull; i < User_Num - 2; i++){
+            for (u64 i = 0ull; i < User_Num - 1; i++){
                 recvThrds[i] = std::thread([&, i]() {
-                    GCT[i].resize(P_size);
-                    coproto::sync_wait(Chl[i].recv(GCT[i]));
+                        coproto::sync_wait(Chl[i].recv(GCT[i]));
                     return ;
                 });
             }
@@ -304,47 +323,66 @@ namespace volePSI
             for (auto& thrd : recvThrds) thrd.join();
 
             setTimePoint("receive GCT Finish");
-            
-            // Reconstruct OKVS "GCT"
-            // GCT = xor GCT[i]  i = [0,User_Num-2]
-            // i.e. " GCT[0] = GCT[0] ^ GCT[i] " in the code
 
-            for (u64 i = 1; i < User_Num - 1; i++){
-                for (u64 j = 0; j < P_size; j++)
-                    GCT[0][j] ^= GCT[i][j];
+            // Decode OKVS "GCT[i]" i = [0, User_Num-2] and compute the XOR-sum using all elements in Inputs
+            // Result[j] = xor Result_i[j] where Result_i[j] = Decode ( Inputs[j], GCT[i] ) i = [0, User_Num-2]
+
+            std::vector<block> Result(Set_Size[My_Id]);
+            
+            bool Size_Equal = (Set_Size[User_Num - 1] == Set_Size[My_Id]);
+            for (u64 i = 0ull; i < User_Num - 2; i++)
+                if (Set_Size[i] != Set_Size[My_Id]){
+                    Size_Equal = false;
+                    break;
+                }
+
+            if (Size_Equal){
+                for (u64 i = 1ull; i < User_Num - 1; i++){
+                    for (u64 j = 0ull; j < P_size[0]; j++)
+                        GCT[0][j] ^= GCT[i][j];
+                Paxos[0].decode<block>(Inputs,Result,GCT[0],Thread_Num);
+                }
+            }
+            else{
+                std::vector<block> Result_i(Set_Size[My_Id]);
+                for (u64 i = 0ull; i < User_Num - 1; i++){
+                    Paxos[i].decode<block>(Inputs,Result_i,GCT[i],Thread_Num);
+                    for (u64 j = 0ull; j < Set_Size[My_Id]; j++){
+                        Result[j] ^= Result_i[j];
+                        Result_i[j] = osuCrypto::ZeroBlock;
+                    }
+                }                
             }
 
-            // Decode OKVS "GCT" (i.e. GCT[0] here) using all elements in Inputs
-            // Result[i] = Decode ( Inputs[i], GCT[0] )
-
-            Paxos.decode<block>(Inputs,Result,GCT[0],Thread_Num);
 
             setTimePoint("Decode Finish");
             
             // If there is "-CA", only output the intersection size (MPSI-CA) 
             // Otherwise, output the complete intersection (Standard MPSI)
 
-            if (!PSI_CA){
+            if (!PSI_CA && !Circuit){
 
                 // Invoke 2-party PSI with Leader P_(User_Num-1)
-                // Input "Result" ( values during OKVS "GCT[0]" Decode )
+                // Input "Result" ( XOR-sum of GCT[i] Decode )
+
+                setTimePoint("2PSI Begin");
 
                 RsPsiSender Psi_Sender;
-                Psi_Sender.init(Set_Size,Set_Size,Lambda,Seed,Mal,Thread_Num);
+                Psi_Sender.init(Set_Size[My_Id],Set_Size[User_Num - 1],Lambda,Seed,Mal,Thread_Num);
                 auto p = Psi_Sender.run(Result, Chl[User_Num - 2]);
                 auto re = macoro::sync_wait(macoro::when_all_ready(std::move(p)));
  
                 setTimePoint("2PSI Finish");
 
             }
-            else{
+            else if (PSI_CA && !Circuit){
 
                 // Run 2-party DH-based PSI-CA with Leader P_(User_Num-1)
                 // Input "Result" ( values during OKVS "GCT[0]" Decode )
 
                 setTimePoint("2PSI-CA Begin");
 
-                std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size),Re_point(Set_Size);
+                std::vector<osuCrypto::Sodium::Monty25519> Se_point(Set_Size[My_Id]),Re_point(Set_Size[User_Num - 1]);
                 osuCrypto::Sodium::Scalar25519 G = osuCrypto::Sodium::Scalar25519(Prng);
 
                 if (Thread_Num > 1){
@@ -355,7 +393,7 @@ namespace volePSI
                         X_alpha[i] = std::thread([&, i]() {
                             unsigned char Th_point_bytes[32];  
                             memset(Th_point_bytes,0,32);
-                            u64 Th_Begin = i * Set_Size / Thread_Num, Th_End = (i+1) * Set_Size / Thread_Num;
+                            u64 Th_Begin = i * Set_Size[My_Id] / Thread_Num, Th_End = (i+1) * Set_Size[My_Id] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++){
                                 unsigned char* block_bytes = Result[j].data();
                                 memcpy(Th_point_bytes, block_bytes, 16);
@@ -375,7 +413,7 @@ namespace volePSI
 
                     for (u64 i = 0ull; i < Thread_Num; i++){
                         Y_alpha_beta[i] = std::thread([&, i]() {
-                            u64 Th_Begin = i * Set_Size / Thread_Num, Th_End = (i+1) * Set_Size / Thread_Num;
+                            u64 Th_Begin = i * Set_Size[User_Num - 1] / Thread_Num, Th_End = (i+1) * Set_Size[User_Num - 1] / Thread_Num;
                             for (u64 j = Th_Begin; j < Th_End; j++){
                                 Re_point[j] = G * Re_point[j];
                             }
@@ -394,7 +432,7 @@ namespace volePSI
                     unsigned char point_bytes[32]; 
                     memset(point_bytes,0,32);
 
-                    for (u64 i = 0ull; i < Set_Size; i++){
+                    for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                         unsigned char* block_bytes = Result[i].data();
                         memcpy(point_bytes, block_bytes, 16);
                         Se_point[i].fromBytes(point_bytes);
@@ -404,7 +442,7 @@ namespace volePSI
                     coproto::sync_wait(Chl[User_Num - 2].send(Se_point));
                     coproto::sync_wait(Chl[User_Num - 2].recv(Re_point));
 
-                    for (u64 i = 0; i < Set_Size; i++)
+                    for (u64 i = 0; i < Set_Size[User_Num - 1]; i++)
                         Re_point[i] = G * Re_point[i];
                     
                     std::shuffle(Re_point.begin(),Re_point.end(),Prng);
@@ -412,6 +450,25 @@ namespace volePSI
                 }
 
                 setTimePoint("2PSI-CA Finish");
+            }
+            else if (!PSI_CA && Circuit){
+
+                // Invoke 2-party Circuit PSI with Leader P_(User_Num-1)
+                
+                setTimePoint("2CPSI Begin");
+            
+                RsCpsiSender Cpsi_Sender;
+                Cpsi_Sender.init(Set_Size[My_Id],Set_Size[User_Num - 1],sizeof(block),Lambda,Seed,Thread_Num);
+
+                // Payload 
+                oc::Matrix<u8> cir_values(Set_Size[My_Id], sizeof(block));
+                std::memcpy(cir_values.data(), Result.data(), Set_Size[My_Id] * sizeof(block));
+
+                auto p = Cpsi_Sender.send(Result,cir_values,Sender_Cpsi_Results,Chl[User_Num - 2]);
+                auto se = macoro::sync_wait(macoro::when_all_ready(std::move(p)));        
+
+                setTimePoint("2CPSI Finish");  
+
             }
 
             // If there is "-BC", Pivot receives the MPSI(-CA) result from Leader's broadcast
@@ -422,6 +479,7 @@ namespace volePSI
                     Multi_Intersection.resize(Size_Intersection);
                     coproto::sync_wait(Chl[User_Num - 2].recv(Multi_Intersection));
                 }
+                    
                 setTimePoint("Receive Intersection Finish");
             }
 
@@ -439,15 +497,27 @@ namespace volePSI
 
         else
         {
-
+            
             if (Mal){
                 oc::RandomOracle RO(sizeof(block));
-                for (u64 i = 0ull; i < Set_Size; i++){
+                for (u64 i = 0ull; i < Set_Size[My_Id]; i++){
                     RO.Reset();
                     RO.Update(Inputs[i].data(), sizeof(block));
                     RO.Final(Inputs[i]);
                 }
             }
+
+            // Init OKVS "GCT" & "Share" 
+            // "P_size_En" is the size of GCT
+            // "P_size_De" is the size of Share
+
+            Baxos Paxos_De,Paxos_En;
+            u64 P_size_De,P_size_En;
+            Paxos_De.init(Set_Size[User_Num - 1], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
+            P_size_De=Paxos_De.size();
+            Paxos_En.init(Set_Size[My_Id], GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
+            P_size_En=Paxos_En.size();
+            std::vector<block> Share(P_size_De), GCT(P_size_En);
 
             // Receive Share_Seed[i] (i.e. Share_Seed here) from Leader P_(User_Num-1) 
 
@@ -457,9 +527,7 @@ namespace volePSI
             // Reconstruct OKVS "Share"
             // Share = PRG ( Share_Seed )
 
-            Paxos.init(Set_Size, GCT_Bin_Size, CUCKOO_HASH_NUM, Lambda, PaxosParam::GF128, HASH_SEED);
-            P_size=Paxos.size();
-            std::vector<block> Share(P_size), Decode_Share(Set_Size);
+            std::vector<block> Decode_Share(Set_Size[My_Id]);
             PRNG Share_Prng(Share_Seed);
             Share_Prng.get<block>(Share);
 
@@ -470,10 +538,8 @@ namespace volePSI
             // Then Encode another OKVS "GCT"
             // GCT = Encode ( { ( Inputs[i], Decode_Share[i] ) } )
 
-            std::vector<block> GCT(P_size);
-
-            Paxos.decode<block>(Inputs,Decode_Share,Share,Thread_Num);
-            Paxos.solve<block>(Inputs,Decode_Share,GCT,&Prng,1);
+            Paxos_De.decode<block>(Inputs,Decode_Share,Share,Thread_Num);
+            Paxos_En.solve<block>(Inputs,Decode_Share,GCT,&Prng,1);
 
             setTimePoint("GCT Reconstruction Finish");
             

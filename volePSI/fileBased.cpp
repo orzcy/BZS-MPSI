@@ -1,7 +1,7 @@
 #include "fileBased.h"
 #include "cryptoTools/Crypto/RandomOracle.h"
 #include "RsPsi.h"
-#include "fbMpsi.h"
+#include "Mpsi.h"
 #include "RpmtPsu.h"
 #include <unordered_set>
 
@@ -435,7 +435,7 @@ namespace volePSI
 
             // init
 
-            fbMpsi_User User;
+            Mpsi_User User;
             auto inpath = cmd.get<std::string>("in");
             auto outPath = cmd.getOr<std::string>("out", inpath + ".out");
             u64 User_Num = cmd.getOr("nu", 3ull);
@@ -444,6 +444,7 @@ namespace volePSI
             u64 Thread_Num = cmd.getOr("nt", 1ull);
             bool broadcast = cmd.isSet("bc");
             bool PSI_CA = cmd.isSet("ca");
+            bool Circuit = cmd.isSet("ci");
             bool Mal = cmd.isSet("ma");
             bool Need_Unique = cmd.isSet("un");
 
@@ -525,7 +526,7 @@ namespace volePSI
             // "synchronize" Set_Size
             // unlike the benchmark, different participants may have different set sizes in real-life scenarios
 
-            u64 Set_Size[User_Num]={0};
+            u64 Set_Size[User_Num]={0ull};
             Set_Size[My_Id] = User_Set.size();
 
             if (My_Id == User_Num - 1){
@@ -566,9 +567,9 @@ namespace volePSI
                 coproto::sync_wait(Chl[0].recv(Set_Size[User_Num - 1]));
             }
             
-            // run a participant in BZS-MPSI (/volepsi/fbMpsi.cpp)
+            // run a participant in BZS-MPSI (/volepsi/Mpsi.cpp)
 
-            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast, Mal);
+            User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, Circuit, broadcast, Mal);
 
             // write output to file
 

@@ -526,6 +526,7 @@ void perfMpsi_User(oc::CLP& cmd)
 	u64 Thread_Num = cmd.getOr("nt", 1);
 	u64 Test_Size = cmd.getOr("ts", Set_Size/10);
 	bool PSI_CA = cmd.isSet("ca");
+	bool Circuit = cmd.isSet("ci");
 	bool broadcast = cmd.isSet("bc");
 	bool Mal = cmd.isSet("ma");
 	std::string ipp = cmd.getOr<std::string>("ipp", "localhost");
@@ -564,7 +565,7 @@ void perfMpsi_User(oc::CLP& cmd)
 		exip = ipp + ":" + std::to_string(PIVOT_CLIENT_BASE_PORT + My_Id);
 		Chl[1] = coproto::asioConnect(exip, false);
 	}
-
+	
 	block Seed=block(My_Id, My_Id);
 	PRNG prng(Seed);
 
@@ -580,6 +581,11 @@ void perfMpsi_User(oc::CLP& cmd)
 
 	for (u64 j=0ull; j<Test_Size; j++)
 		User_Set[(j+My_Id)%Set_Size]=toBlock(j);
+
+	u64 All_Set_Size[User_Num];
+
+	for (u64 i = 0ull; i < User_Num; i++)
+		All_Set_Size[i] = Set_Size;
 	
 	// run a participant in benchmark (/volepsi/Mpsi.cpp)
 
@@ -587,7 +593,7 @@ void perfMpsi_User(oc::CLP& cmd)
 	Timer time, timer;
 	User.setTimer(timer);
 	time.setTimePoint("start");
-	User.run(User_Num, My_Id, Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, broadcast, Mal);
+	User.run(User_Num, My_Id, All_Set_Size, Lambda, Thread_Num, Seed, User_Set, Chl, PSI_CA, Circuit, broadcast, Mal);
 	time.setTimePoint("end");
 
 	// output at the terminal

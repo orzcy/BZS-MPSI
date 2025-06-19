@@ -8,7 +8,6 @@ set(SRCS
     "SimpleIndex.cpp"
     "fileBased.cpp"
     "Mpsi.cpp"
-    "fbMpsi.cpp"
     "RpmtPsu.cpp"
     )
 
