@@ -20,20 +20,20 @@
 namespace volePSI
 {
 
-    void RpmtPsu_User::run(bool My_Role, u64 Sender_Set_Size, u64 Receiver_Set_Size, u64 Sender_Max_Length, u64 Lambda, u64 Thread_Num, block Seed, std::vector<std::string> Inputs_String, Socket& Chl){
+    void RpmtPsu_User::run(bool My_Role, u64 Sender_Set_Size, u64 Receiver_Set_Size, u64 Lambda, u64 Thread_Num, block Seed, std::vector<block> Inputs, Socket& Chl){
 
         if (My_Role == 1){
 
             // DH-Based RPMT
 
             PRNG Prng(Seed);
-            oc::RandomOracle hash(16);
+            oc::RandomOracle hash(sizeof(block));
             std::vector<block> Inputs_DH(Receiver_Set_Size);
 
             for (u64 i = 0ull; i < Receiver_Set_Size; i++)
             {
                 hash.Reset();
-                hash.Update(Inputs_String[i].data(), Inputs_String[i].size());
+                hash.Update(Inputs[i].data(), sizeof(block));
                 hash.Final(Inputs_DH[i]);
             }
 
@@ -124,31 +124,22 @@ namespace volePSI
 
             for (u64 i = 0; i < Sender_Set_Size; i++)
                 Se_check[i] = (Re_set.find(Se_block[i]) != Re_set.end());
-
+                
             // OT Receiver
 
-            u64 Block_Num = ((Sender_Max_Length + 15ull) / 16) + 1ull;
-            u64 OT_Num = Block_Num * Sender_Set_Size;
-            std::vector<bool> OT_Choise(OT_Num);
-            
-            for (u64 i = 0ull; i < Sender_Set_Size; i++)
-                for (u64 j = 0ull; j < Block_Num; j++)
-                    OT_Choise[i*Block_Num+j] = Se_check[i];
+            std::vector<oc::block> recvMsg(Sender_Set_Size);
 
-            std::vector<oc::block> recvMsg(OT_Num);
-
-            if(OT_Num <= 128) // using libOTe-CO15
+            if(Sender_Set_Size <= 128) // using libOTe-CO15
             {
                 PRNG prng(oc::block(oc::sysRandomSeed()));
                 osuCrypto::DefaultBaseOT baseOTs;
-                std::vector<oc::block> mask(OT_Num);
-                std::vector<oc::block> maskMsg(OT_Num);
+                std::vector<oc::block> mask(Sender_Set_Size);
+                std::vector<oc::block> maskMsg(Sender_Set_Size);
 
                 osuCrypto::BitVector choices;
-                choices.resize(OT_Num);
-                for(u64 i = 0; i < OT_Num; i++) {
-                    choices[i] = 1 - OT_Choise[i];
-                }
+                choices.resize(Sender_Set_Size);
+                for(u64 i = 0; i < Sender_Set_Size; i++)
+                    choices[i] = 1 - Se_check[i];
 
                 // random OT
                 auto p = baseOTs.receive(choices, mask, prng, Chl);
@@ -157,15 +148,15 @@ namespace volePSI
 
                 // random OT -> OT
                 coproto::sync_wait(Chl.recv(maskMsg));
-                for(u64 i = 0; i < OT_Num; i++)
+                for(u64 i = 0; i < Sender_Set_Size; i++)
                     recvMsg[i] = maskMsg[i] ^ mask[i];
             }
             else // IKNP
             {
                 PRNG prng(oc::block(oc::sysRandomSeed()));
                 oc::DefaultBaseOT baseOTs;
-                std::vector<oc::block> mask(OT_Num);
-                std::vector<oc::block> maskMsg(OT_Num);
+                std::vector<oc::block> mask(Sender_Set_Size);
+                std::vector<oc::block> maskMsg(Sender_Set_Size);
                 std::vector<std::array<oc::block, 2>> baseSend(128); // kappa == 128
 
                 prng.get((u8*)baseSend.data()->data(), sizeof(oc::block) * 2 * baseSend.size());
@@ -177,9 +168,9 @@ namespace volePSI
                 recv.setBaseOts(baseSend);
                 
                 osuCrypto::BitVector choices;
-                choices.resize(OT_Num);
-                for(u64 i = 0; i < OT_Num; i++) {
-                    choices[i] = 1 - OT_Choise[i];
+                choices.resize(Sender_Set_Size);
+                for(u64 i = 0; i < Sender_Set_Size; i++) {
+                    choices[i] = 1 - Se_check[i];
                 }
 
                 auto proto = recv.receive(choices, mask, prng, Chl);
@@ -188,14 +179,12 @@ namespace volePSI
 
                 // random OT -> OT
                 coproto::sync_wait(Chl.recv(maskMsg));
-                for(u64 i = 0; i < OT_Num; i++)
+                for(u64 i = 0; i < Sender_Set_Size; i++)
                     recvMsg[i] = maskMsg[i] ^ mask[i];
             }
-            for (u64 i = 0ull; i < Sender_Set_Size; i++)
+            for (u64 i = 0; i < Sender_Set_Size; i++)
                 if (Se_check[i] == 0){
-                    Size_Different++; 
-                    for (u64 j = 0ull; j < Block_Num; j++)
-                        Different.push_back(recvMsg[i*Block_Num+j]); 
+                    Size_Different++; Different.push_back(recvMsg[i]); 
                 }
         }
         else {
@@ -203,13 +192,13 @@ namespace volePSI
             // DH-Based RPMT
 
             PRNG Prng(Seed);
-            oc::RandomOracle hash(16);
+            oc::RandomOracle hash(sizeof(block));
             std::vector<block> Inputs_DH(Sender_Set_Size);
 
             for (u64 i = 0ull; i < Sender_Set_Size; i++)
             {
                 hash.Reset();
-                hash.Update(Inputs_String[i].data(), Inputs_String[i].size());
+                hash.Update(Inputs[i].data(), sizeof(block));
                 hash.Final(Inputs_DH[i]);
             }
 
@@ -286,40 +275,16 @@ namespace volePSI
 
             // OT Sender
 
-            u64 Block_Num = ((Sender_Max_Length + 15ull) / 16) + 1ull;
-            u64 OT_Num = Block_Num * Sender_Set_Size;
-            u64 lowu, highu;
-            std::vector<block> Rand_Num(OT_Num), OT_Inputs(OT_Num);
+            std::vector<block> Rand_Num(Sender_Set_Size);
             Prng.get<block>(Rand_Num);
-            
-            for (u64 i = 0ull; i < Sender_Set_Size; i++){
-                u64 Length = Inputs_String[i].length();
-                OT_Inputs[i*Block_Num] = oc::toBlock(Length);
-                for (u64 j = 1ull; j < Block_Num; j++){
-                    lowu = 0ull; highu = 0ull;
-                    for (u64 k = 0ull; k < 8ull; k++){
-                        highu = highu << 8;
-                        u64 Now_At = (j-1)*16+k;
-                        if (Now_At < Length)
-                            highu = highu | Inputs_String[i][Now_At];
-                    }
-                    for (u64 k = 8ull; k < 16ull; k++){
-                        lowu = lowu << 8;
-                        u64 Now_At = (j-1)*16+k;
-                        if (Now_At < Length)
-                            lowu = lowu | Inputs_String[i][Now_At];
-                    }
-                    OT_Inputs[i*Block_Num+j] = oc::toBlock(highu,lowu);
-                }
-            }
 
-            if(OT_Num <= 128) // using libOTe-CO15
+            if(Sender_Set_Size <= 128) // using libOTe-CO15
             {
                 // config basic messages
                 osuCrypto::DefaultBaseOT baseOTs;
                 PRNG prng(oc::block(oc::sysRandomSeed()));
-                std::vector<oc::block> half_sendMsg(OT_Num);
-                std::vector<std::array<oc::block, 2>> randMsg(OT_Num);
+                std::vector<oc::block> half_sendMsg(Sender_Set_Size);
+                std::vector<std::array<oc::block, 2>> randMsg(Sender_Set_Size);
 
                 // generate random OT
                 auto p = baseOTs.send(randMsg, prng, Chl);
@@ -327,24 +292,23 @@ namespace volePSI
                 std::get<0>(r).result();
 
                 // random OT -> OT
-                for(u64 i = 0; i < OT_Num; i++)
+                for(u64 i = 0; i < Sender_Set_Size; i++)
                 {
-                    half_sendMsg[i] = OT_Inputs[i] ^ randMsg[i][1];
+                    half_sendMsg[i] = Inputs[i] ^ randMsg[i][1];
                 }
                 coproto::sync_wait(Chl.send(half_sendMsg));
             }
             else // IKNP
             {
-
                 // configure
                 oc::DefaultBaseOT baseOTs;
                 PRNG prng(oc::block(oc::sysRandomSeed()));
-                std::vector<oc::block> half_sendMsg(OT_Num);
-                std::vector<std::array<oc::block, 2>> randMsg(OT_Num);
+                std::vector<oc::block> half_sendMsg(Sender_Set_Size);
+                std::vector<std::array<oc::block, 2>> randMsg(Sender_Set_Size);
 
                 // set base random messages
-                std::vector<oc::block> baseRecv(128); // kappa == 128
-                osuCrypto::BitVector baseChoice(128); // kappa == 128
+                std::vector<oc::block> baseRecv(128);   // kappa == 128
+                osuCrypto::BitVector baseChoice(128);   // kappa == 128
                 
                 baseChoice.randomize(prng);
 
@@ -361,9 +325,9 @@ namespace volePSI
                 std::get<0>(result).result();
 
                 // random OT -> OT
-                for(u64 i = 0; i < OT_Num; i++)
+                for(u64 i = 0; i < Sender_Set_Size; i++)
                 {
-                    half_sendMsg[i] = OT_Inputs[i] ^ randMsg[i][1];
+                    half_sendMsg[i] = Inputs[i] ^ randMsg[i][1];
                 }
                 coproto::sync_wait(Chl.send(half_sendMsg));
             }
